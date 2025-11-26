@@ -26,3 +26,11 @@ conda install pytorch=1.12.1 torchvision=0.13.1 torchaudio=0.12.1 cudatoolkit=11
 6. install requirements.txt
 
 pip install -r requirements.txt
+
+## 포함되지 않은 대용량 파일
+
+./data
+
+./decalib/models/OpenGraphAU/checkpoints/
+
+추후 받을 수 있는 저장소를 얻어 업로드 예정
