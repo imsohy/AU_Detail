@@ -1,0 +1,3 @@
+# OpenGraphAU 체크포인트들만 무시
+decalib/models/OpenGraphAU/checkpoints/*.pth
+decalib/models/OpenGraphAU/checkpoints/*.pt

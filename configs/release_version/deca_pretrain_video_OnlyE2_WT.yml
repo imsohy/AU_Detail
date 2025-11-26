@@ -1,0 +1,72 @@
+# '''
+# '''
+# first step:
+# pre-train the coarse model (i.e.𝐸𝑐) for two epochs with a batch size of 64,
+# with 𝜆𝑙𝑚𝑘=1𝑒−4, 𝜆𝑒𝑦𝑒=1.0, 𝜆𝜷=1𝑒−4, and 𝜆𝝍=1𝑒−4
+
+# Why:
+# training with only lmk loss for good initialization,
+# because the use of photometric loss needs good initialization both in regression and optimization
+# and also, photometric loss needs differentiable rendering that makes the training slow
+#
+#
+# '''
+#output_dir: "Training/pretrain3_10   24_i"
+#output_dir: "Training/pretrain1_236"
+#output_dir: "Training1_videoC_OnlyE/pretrain1X1"
+output_dir: "/home/cine/Documents/HWPJ/windowTest"
+pretrained_modelpath: ''
+#model_path_HJ: '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'
+dataset:
+  batch_size: 1
+  K: 7
+  windowsize: 7
+loss:
+  #  expression: 0.0
+  #  eyed: 0.3
+  #  id: 0.0
+  #  lipd: 0.05
+  #  lipread: 0.0
+  #  lmk: 2.0
+  #  lmk_mp: 2.0
+  #  photo: 0.0
+  #  reg_exp: 0.001
+  #  reg_jaw_pose: 0.0
+  #  reg_light: 0.0
+  #  reg_shape: 0.0001
+  #  reg_tex: 0.0
+  #  relaL: 0.2
+  expression: 7.0
+  eyed: 1.
+  lipd: 0.0
+  lmk: 8.0
+  lmk_mp: 8.0
+  photo: 5.0
+  reg_exp: 1e-04
+  reg_jaw_pose: 0.01
+  #  reg_light: 0.0
+  reg_shape: 0.0
+  #  reg_tex: 0.
+  #  reg_light: 0.
+  reg_tex: 1e-04
+  reg_light: 1.
+  #  reg_tex: 0.0
+  relaL: 1.
+  AUFLoss: 1.
+  mainAU: 0.5
+  subAU: 0.25
+  weightedAU: False
+  focalAU: False
+train:
+  resume: True
+  max_epochs: 50
+  max_steps: 1000000000000000000
+  log_steps: 1000
+  vis_steps: 1000
+  checkpoint_steps: 500
+  #  val_steps: 500
+  #  eval_steps: 1000
+  #  lr: 1e-4
+  lr: 1e-4
+model:
+  use_tex: True
