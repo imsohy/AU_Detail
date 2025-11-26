@@ -34,3 +34,7 @@ pip install -r requirements.txt
 ./decalib/models/OpenGraphAU/checkpoints/
 
 추후 받을 수 있는 저장소를 얻어 업로드 예정
+
+## Train
+
+## Demo
