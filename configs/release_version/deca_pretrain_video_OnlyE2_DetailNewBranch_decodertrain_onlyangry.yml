@@ -1,0 +1,119 @@
+# ============================================================================
+# 학습 방법 가이드 (Training Guide)
+# ============================================================================
+# 
+# 이 설정 파일은 Coarse 모델과 Detail 모델을 독립적으로 또는 함께 학습할 수 있습니다.
+#
+# 【학습 모드 설정】
+# train 섹션에서 다음 옵션을 설정할 수 있습니다:
+#   - train_coarse: True/False  (Coarse 모델 학습 여부)
+#   - train_detail: True/False  (Detail 모델 학습 여부)
+#   * 최소 하나는 True여야 합니다.
+#
+# 【가중치 로딩 방법】
+#
+# 1. pretrained_modelpath:
+#    - 전체 모델 가중치를 로드합니다 (E_flame, E_detail, D_detail, BiViT, ViTDetail)
+#    - 빈 문자열('')이면 처음부터 학습합니다
+#
+# 2. pretrained_coarse_modelpath:
+#    - Coarse 모델 가중치만 로드합니다 (E_flame, BiViT)
+#    - pretrained_modelpath에서 로드한 E_flame과 BiViT를 덮어씁니다
+#    - train_coarse=False일 때는 반드시 설정해야 합니다 (에러 발생)
+#    - train_coarse=True일 때는 선택사항입니다 (없으면 처음부터 학습)
+#
+# 【학습 시나리오 예시】
+#
+# 시나리오 1: Coarse만 학습 (train_coarse=True, train_detail=False)
+#   - pretrained_coarse_modelpath: 설정하면 파인튜닝, 없으면 처음부터 학습
+#
+# 시나리오 2: Detail만 학습 (train_coarse=False, train_detail=True)
+#   - pretrained_coarse_modelpath: 반드시 설정 필요 (Coarse 모델 freeze)
+#   - pretrained_modelpath: Detail 모델 초기화용 (선택사항)
+#
+# 시나리오 3: 둘 다 학습 (train_coarse=True, train_detail=True)
+#   - pretrained_modelpath: 전체 모델 초기화용 (선택사항)
+#   - pretrained_coarse_modelpath: Coarse 모델 초기화용 (선택사항)
+#
+# 【주의사항】
+# - pretrained_coarse_modelpath가 있으면 항상 로드되며, pretrained_modelpath의 
+#   E_flame과 BiViT를 덮어씁니다 (의도된 동작)
+# - train_coarse=False인데 pretrained_coarse_modelpath가 없으면 에러가 발생합니다
+#
+# ============================================================================
+# '''
+# '''
+# first step:
+# pre-train the coarse model (i.e.𝐸𝑐) for two epochs with a batch size of 64,
+# with 𝜆𝑙𝑚𝑘=1𝑒−4, 𝜆𝑒𝑦𝑒=1.0, 𝜆𝜷=1𝑒−4, and 𝜆𝝍=1𝑒−4
+
+# Why:
+# training with only lmk loss for good initialization,
+# because the use of photometric loss needs good initialization both in regression and optimization
+# and also, photometric loss needs differentiable rendering that makes the training slow
+#
+#
+# '''
+output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNewBranch_decodertrain_onlyangry/"
+pretrained_modelpath: ''
+pretrained_coarse_modelpath: '/media/cine/First/HJCode2/AUSequence/Training1_videoC_OnlyE_AULossF/pretrain2/model.tar'
+#model_path_HJ: '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'
+multi_gpu: False #True/False
+device: 'cuda:0'           # Coarse 모델용 GPU
+device_detail: 'cuda:1'    # Detail 모델용 GPU (이것이 없으면 둘 다 cuda:0 사용!)
+dataset:
+  batch_size: 1
+  K: 3 #K =windowsize
+loss:
+  #  expression: 0.0
+  #  eyed: 0.3
+  #  id: 0.0
+  #  lipd: 0.05
+  #  lipread: 0.0
+  #  lmk: 2.0
+  #  lmk_mp: 2.0
+  #  photo: 0.0
+  #  reg_exp: 0.001
+  #  reg_jaw_pose: 0.0
+  #  reg_light: 0.0
+  #  reg_shape: 0.0001
+  #  reg_tex: 0.0
+  #  relaL: 0.2
+  expression: 7.0
+  eyed: 1.
+  lipd: 0.0
+  lmk: 8.0
+  lmk_mp: 8.0
+  photo: 5.0
+  reg_exp: 1e-04
+  reg_jaw_pose: 0.01
+  #  reg_light: 0.0
+  reg_shape: 0.0
+  #  reg_tex: 0.
+  #  reg_light: 0.
+  reg_tex: 1e-04
+  reg_light: 1.
+  #  reg_tex: 0.0
+  relaL: 1.
+  AUFLoss: 1.
+  mainAU: 0.5
+  subAU: 0.25
+  weightedAU: False
+  focalAU: False
+train:
+  # 학습 모드 설정 (최소 하나는 True여야 함)
+  train_coarse: True   # Coarse 모델(BiViT) 학습 여부
+  train_detail: True   # Detail 모델(ViTDetail, D_detail) 학습 여부
+  
+  resume: True
+  max_epochs: 50
+  max_steps: 1000000000000000000
+  log_steps: 1000
+  vis_steps: 1000
+  checkpoint_steps: 500
+  #  val_steps: 500
+  #  eval_steps: 1000
+  #  lr: 1e-4
+  lr: 1e-4
+model:
+  use_tex: True

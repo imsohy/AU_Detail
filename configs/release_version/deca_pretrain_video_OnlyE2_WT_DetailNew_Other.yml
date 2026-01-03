@@ -1,3 +1,5 @@
+#실험날짜 20251221
+#디코더까지 파인튜닝 포함해서 오픈.
 # '''
 # '''
 # first step:
@@ -14,7 +16,7 @@
 #output_dir: "Training/pretrain3_10   24_i"
 #output_dir: "Training/pretrain1_236"
 #output_dir: "Training1_videoC_OnlyE/pretrain1X1"
-output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNewOther/"
+output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNewBranch_decodertrain_v2/"
 pretrained_modelpath: ''
 #model_path_HJ: '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'
 multi_gpu: False #True/False

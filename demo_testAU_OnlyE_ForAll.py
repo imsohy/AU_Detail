@@ -206,7 +206,7 @@ if __name__ == '__main__':
                         help='path to the test data, can be image folder, image path, image list, video')
     # parser.add_argument('-s', '--savefolder', default='TestReult/pretrainNewIdea_236B/wild2/', type=str,
     # parser.add_argument('-s', '--savefolder', default='TestReult/pretrainNewIdea_236B/woman_SR2/', type=str,
-    parser.add_argument('-s', '--savefolder', default='/media/cine/First/HWPJ2/DetailNewDemo/' + name,
+    parser.add_argument('-s', '--savefolder', default='/media/cine/First/HWPJ2/ProjectResult/Demos/DetailNew_FT2_Demo/' + name,
                         type=str,
                         # parser.add_argument('-s', '--savefolder', default='TestReult/pretrainNewIdea_236B_/35-30-1920x1080_sequence/68X1_M', type=str,
                         # parser.add_argument('-s', '--savefolder', default='TestReult/pretrainNewIdea_236B/Actor_02angry_retina_e10/', type=str,
@@ -215,7 +215,7 @@ if __name__ == '__main__':
     # parser.add_argument('--pretrained_modelpath_ViT', default='/media/cine/First/TransformerCode/NewIdea3ViT2/Training/pretrainB_236_2/model.tar', type=str, help='model.tar path')
     # parser.add_argument('--pretrained_modelpath_ViT', default='/home/cine/Documents/NewDECA_ViT_Video/Training/pretrain3_exp/model.tar', type=str, help='model.tar path')
     parser.add_argument('--pretrained_modelpath_ViT',
-                        default='/media/cine/First/HWPJ2/DetailNew/model.tar', type=str,
+                        default='/media/cine/First/HWPJ2/ProjectResult/DetailNew_FineTune_2/model.tar', type=str,
                         help='model.tar path')
     parser.add_argument('--device', default='cuda:1', type=str,
                         help='set device, cpu for using cpu')

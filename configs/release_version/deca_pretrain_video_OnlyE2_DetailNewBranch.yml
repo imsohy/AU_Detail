@@ -14,7 +14,7 @@
 #output_dir: "Training/pretrain3_10   24_i"
 #output_dir: "Training/pretrain1_236"
 #output_dir: "Training1_videoC_OnlyE/pretrain1X1"
-output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNewBranch/"
+output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNewBranch_test/"
 pretrained_modelpath: ''
 #model_path_HJ: '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'
 multi_gpu: False #True/False

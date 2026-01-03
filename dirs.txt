@@ -1,0 +1,8 @@
+/home/cine/Downloads/actors/images/**
+/media/cine/de6afd1d-c444-4d43-a787-079519ace719/DISFA/video/**
+/home/cine/Downloads/AFEW-VA/**
+/media/cine/First/Aff-wild2/**
+/media/cine/de6afd1d-c444-4d43-a787-079519ace719/MEAD_Dataset_25/**
+/media/cine/First/HWPJ2/ProjectResult/DetailNew/**
+/media/cine/First/HWPJ2/ProjectResult/DetailNewDemo/**
+/media/cine/First/HWPJ2/NewProject/AllCodePaste/**
