@@ -118,11 +118,11 @@ class Trainer(object):
                     util.copy_state_dict(model_dict[key], checkpoint[key])
                     logger.info(f'  Loaded {key} from pretrained_modelpath')
             
-            # Load D_detail_original from pretrained D_detail weights (frozen decoder)
-            if 'D_detail' in checkpoint.keys() and hasattr(self.mymodel, 'D_detail_original'):
-                util.copy_state_dict(self.mymodel.D_detail_original.state_dict(), checkpoint['D_detail'])
+            # D_detail_original is now handled inside DECA.__init__ to ensure it always remains the original DECA weights.
+            # We don't load it here from pretrained_modelpath to avoid accidental overwrites if that path points to a trained model.
+            if hasattr(self.mymodel, 'D_detail_original'):
                 self.mymodel.D_detail_original.eval()
-                logger.info('  D_detail_original loaded from pretrained D_detail weights')
+                logger.info('  D_detail_original ensured to be in eval mode')
         else:
             logger.info('[Step 1/3] pretrained_modelpath not found, starting from scratch')
         
