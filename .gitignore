@@ -1,3 +1,4 @@
+/.idea/
 # OpenGraphAU 체크포인트들만 무시
 decalib/models/OpenGraphAU/
 
@@ -7,3 +8,6 @@ __pycache__/
 *.pyc
 
 /sort/
+/.cursor/
+/.mypy_cache/
+/AU_Sequence codecopy/

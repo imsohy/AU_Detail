@@ -9,7 +9,6 @@ import os
 cfg = CN()
 abs_deca_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 cfg.deca_dir = abs_deca_dir
-
 #--------------------------------------
 #for multi gpu use (coarse detail split)
 #--------------------------------------

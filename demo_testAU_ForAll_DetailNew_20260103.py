@@ -28,10 +28,10 @@ import torch
 # import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from decalib.gatfarec_Video_OnlyExpress_WT_DetailNew import DECA
+from decalib.gatfarec_Video_DetailNew_20260103 import DECA
 from decalib.datasets import datasets2 as datasets
 from decalib.utils import util
-from decalib.utils.config_wt_DetailNew import cfg as deca_cfg
+from decalib.utils.config_wt_DetailNew_20260103 import cfg as deca_cfg
 from decalib.utils.tensor_cropper import transform_points
 
 
@@ -187,7 +187,6 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='DECA: Detailed Expression Capture and Animation')
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
     # parser.add_argument('-i', '--inputpath', default='TestSamples/examples', type=str,
     # # 08, 30, 37, 43, 64, 75
     name = 'Actor_03sad'  # angry, calm, disgust, fear, happy, neutr, sad, surprise
@@ -221,7 +220,9 @@ if __name__ == '__main__':
     parser.add_argument('--pretrained_modelpath_ViT',
                         default='/media/cine/First/HWPJ2/ProjectResult/DetailNew_FineTune_2/model.tar', type=str,
                         help='model.tar path')
-    parser.add_argument('--device', default='cuda:1', type=str,
+    # CUDA_VISIBLE_DEVICES가 설정되어 있으면 cuda:0, 없으면 cuda:1을 기본값으로 사용
+    default_device = 'cuda:0' if os.environ.get('CUDA_VISIBLE_DEVICES') is not None else 'cuda:1'
+    parser.add_argument('--device', default=default_device, type=str,
                         help='set device, cpu for using cpu')
     # process test images
     parser.add_argument('--iscrop', default=False, type=lambda x: x.lower() in ['true', '1'],

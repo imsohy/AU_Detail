@@ -11,6 +11,7 @@ cfg = CN()
 abs_deca_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 cfg.deca_dir = abs_deca_dir
 
+
 # cfg.pretrained_modelpath = "./data/model_new.tar"
 cfg.pretrained_modelpath = ""
 # cfg.pretrained_modelpath = "./data/model_new.tar"

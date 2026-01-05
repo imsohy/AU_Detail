@@ -350,7 +350,7 @@ class DECA(nn.Module):
         codedict['detail'] = detailcode_old
         codedict_our['detail'] = detailcode_ours
 
-        # Performance optimization: 이미 GPU에 있으므로 .to() 불필요
+        #우리의 파라미터 대신, 올드 파라미터를 덮어쓰겠다는 장면.
         codedict['images'] = images_224[self.middleframe:self.middleframe + 1]
         codedict_our['images'] = images_224[self.middleframe:self.middleframe + 1]
 
@@ -444,6 +444,10 @@ class DECA(nn.Module):
             if self.cfg.model.use_tex:
                 opdict['albedo'] = albedo
                 opdict['albedo_old'] = albedo_old
+
+
+
+            #ORiginal deca detail render.
 
             #original code: if use_detail...
             #DECA original detail render

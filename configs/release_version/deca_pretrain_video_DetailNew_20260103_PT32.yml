@@ -28,7 +28,7 @@
 #
 #
 # '''
-output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNewBranch_20260103_PT32/"
+output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNew_20260103_PT32/"
 pretrained_modelpath: ''
 pretrained_coarse_modelpath: '/media/cine/First/HJCode2/AUSequence/Training1_videoC_OnlyE_AULossF/pretrain2/model.tar'
 #model_path_HJ: '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'

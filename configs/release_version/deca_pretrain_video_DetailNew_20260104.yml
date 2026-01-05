@@ -1,6 +1,4 @@
-# 2026 01 03
-# 변경 내역: mrf 0.05->0.15
-# decoder를 학습하는걸 on/off할 수 있게한다. 이건 그냥 기본 설정이다.
+# 실험일자:2026 01 04 shape 추가
 # ============================================================================
 # 학습 방법 가이드 (Training Guide)
 # ============================================================================
@@ -26,7 +24,7 @@
 #
 #
 # '''
-output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNew_20260103_mrf015/"
+output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNew_20260104/"
 pretrained_modelpath: ''
 pretrained_coarse_modelpath: '/media/cine/First/HJCode2/AUSequence/Training1_videoC_OnlyE_AULossF/pretrain2/model.tar'
 #model_path_HJ: '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'
@@ -73,7 +71,7 @@ loss:
   weightedAU: False
   focalAU: False
 
-  mrf: 0.15
+#mrf = 5e-2
 #photo_D = 2.
 #reg_sym = 0.005
 #reg_z = 0.005
