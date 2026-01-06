@@ -181,41 +181,32 @@ class DECA(nn.Module):
         # resume model
         model_path = self.cfg.pretrained_modelpath
         model_path_224 = self.cfg.pretrained_modelpath_224
-
-        # 1. Always load D_detail_original from the original DECA weights (model_path_224)
-        if os.path.exists(model_path_224):
-            print(f'Loading original DECA detail decoder from {model_path_224}')
-            orig_checkpoint = torch.load(model_path_224)
-            if 'D_detail' in orig_checkpoint:
-                util.copy_state_dict(self.D_detail_original.state_dict(), orig_checkpoint['D_detail'])
-                print('  D_detail_original loaded successfully.')
-        else:
-            print(f'Warning: Original DECA model not found at {model_path_224}. D_detail_original will not be initialized correctly.')
-
-        # 2. Load other modules from either trained model (model_path) or fallback (model_path_224)
-        if os.path.exists(model_path):  # if trained model exists (e.g. during Demo)
+        if os.path.exists(model_path):  # original DECA's path
             print(f'trained model found. load {model_path}')
             checkpoint = torch.load(model_path)
             self.checkpoint = checkpoint
+            # print(checkpoint.keys())
             util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
             util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
             util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
-            # DO NOT load D_detail_original from here, it should remain original
+            util.copy_state_dict(self.D_detail_original.state_dict(), checkpoint['D_detail'])  # Load original weights
             util.copy_state_dict(self.ViTDetail.state_dict(), checkpoint['ViTDetail'])
-            util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
-            
+            util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT']) # ???
             parameters = self.E_flame.state_dict()
+            # for name in self.E_flame.state_dict():
+            #     print(name)
             self.weight = parameters['layers.0.weight']
             self.bias = parameters['layers.0.bias']
-        elif os.path.exists(model_path_224):    # initial training or no trained model
-            print(f'No trained model found. Loading from base model: {model_path_224}')
+        elif os.path.exists(model_path_224):    # this activates.
+            # pretrained path found -> alert
+            print(f'trained model found. load {model_path_224}')
             checkpoint = torch.load(model_path_224)
             self.checkpoint = checkpoint
             util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
             util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
             util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
-            # D_detail_original already loaded above
-            
+            util.copy_state_dict(self.D_detail_original.state_dict(), checkpoint['D_detail'])  # Load original weights
+            # dead code (not used)
             parameters = self.E_flame.state_dict()
             self.weight = parameters['layers.0.weight']
             self.bias = parameters['layers.0.bias']
