@@ -754,14 +754,7 @@ class Trainer(object):
                         print("epoch and step:", epoch, step, self.global_step)
                     
                 if self.global_step>0 and self.global_step % self.cfg.train.checkpoint_steps == 0 or step == (iters_every_epoch-1):
-                    # D_detail은 train_decoder=True일 때만 저장
-                    full_model_dict = self.mymodel.model_dict()
-                    if self.train_decoder:
-                        # train_decoder=True: 모든 모듈 포함
-                        model_dict = full_model_dict
-                    else:
-                        # train_decoder=False: D_detail 제외하고 딕셔너리 구성
-                        model_dict = {k: v for k, v in full_model_dict.items() if k != 'D_detail'}
+                    model_dict = self.mymodel.model_dict()
 
                     # Save optimizers only if they exist
                     if self.opt_coarse is not None:
