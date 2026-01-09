@@ -32,10 +32,10 @@ import torch
 # import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from decalib.gatfarec_Video_OnlyExpress import DECA
-from decalib.datasets import datasets as datasets
+from decalib.gatfarec_Video_DetailNewBranch import DECA
+from decalib.datasets import datasets_nodetector as datasets
 from decalib.utils import util
-from decalib.utils.config import cfg as deca_cfg
+from decalib.utils.config_wt_DetailNewBranch_v3 import cfg as deca_cfg
 from decalib.utils.tensor_cropper import transform_points
 from decalib.models.OpenGraphAU.model.MEFL import MEFARG
 from decalib.models.OpenGraphAU.utils import load_state_dict
@@ -250,7 +250,7 @@ if __name__ == '__main__':
                         # default='/home/cine/Documents/ForPaperResult/TestReult/OnlyE/pretrain1X1/Actor_id/exp_texture/',
                         # default='/home/cine/Documents/ForPaperResult/TestReult/OnlyE/pretrain2/Actor_id/exp_texture/',
                         # default='/home/cine/Documents/ForPaperResult/TestReult/DISFA/AULoss1_ELT/*/',
-                        default='/home/cine/Documents/ForPaperResult/TestReult/DISFA_2/pretrain5X_25_Detail/*/',
+                        default='/media/cine/First/HWPJ2/ProjectResult/Demos/*/',
                         # default='/home/cine/Documents/ForPaperResult/TestReult/DISFA_2/pretrain4/*/',
                         type=str, help='path to the output directory, where results(obj, txt files) will be stored.')
     parser.add_argument('--pretrained_modelpath_ViT',
@@ -259,13 +259,13 @@ if __name__ == '__main__':
                         # default='/home/cine/Documents/HJCode/AU_sequence/Training1_videoC_OnlyE/pretrain1X1/model.tar',
                         # default='/media/cine/First/HJCode2/AUSequence/Training1_videoC_OnlyE/pretrain2/model.tar',
                         # default='/media/cine/First/HJCode2/AUSequence/Training1_videoC_OnlyE/pretrain4/model.tar',
-                        default='/media/cine/First/HJCode2/AUSequence/Training1_videoC_OnlyE/pretrain5X/models/00410099.tar',
+                        default='/media/cine/First/HWPJ2/ProjectResult/DetailNewBranch/model.tar',
                         # default='/media/cine/First/HJCode2/AUSequence/Training1_videoC_OnlyE_AULoss/pretrain1/models/00410099.tar',
                         # default='/media/cine/First/HJCode2/AUSequence/Training1_videoC_OnlyE/pretrain5X/17epoch.tar',
 
                         type=str,
                         help='model.tar path')
-    parser.add_argument('--device', default='cuda:1', type=str,
+    parser.add_argument('--device', default='cuda:0', type=str,
                         help='set device, cpu for using cpu')
     # process test images
     parser.add_argument('--iscrop', default=False, type=lambda x: x.lower() in ['true', '1'],

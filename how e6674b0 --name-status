@@ -1,0 +1,15 @@
+[33mcommit 1805839936180ddc55025dd06e00332f7f0b07c5[m
+Author: legacytachyon <legacytachyon@gmail.com>
+Date:   Tue Jan 6 07:11:26 2026 +0900
+
+    fix ver 20260103 : demo에서 D_decoder_original 가중치 못불러옴 이슈 수정
+    
+    - init / resume / demo 각 3경로의 시나리오를 Cursor를 통해 탐색한 결과, Demo에서는 D_Detail_origin이 덮어 씌워지는 걸 확인함.
+    - 그래서 이에 대한 해결책으로 D_decoder_original은 미리 로딩하고, 나머지를 추가 로딩하는 식으로 코드를 수정함
+    - 사실 20260103은 'train_detail' 옵션 따라 if 분기를 만들수도 있겠으나, 일단 오늘은 여기까지 해보고 테스트.
+
+M	configs/release_version/deca_pretrain_video_OnlyE2_DetailNewBranch_decodertrain_v3.yml
+M	decalib/gatfarec_Video_DetailNewBranch_v3.py
+M	decalib/gatfarec_Video_DetailNew_20260103.py
+M	decalib/trainer_Video_DetailNewBranch_decodertrain_v3.py
+M	decalib/trainer_Video_DetailNew_20260103.py
