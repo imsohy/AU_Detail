@@ -1,3 +1,7 @@
+"""
+원본에서 AU 뽑고 (Sudo GT)
+우리 모델 Detail 포함 렌더링 해서 AU 뽑고 결과값 .csv 로 저장.
+"""
 # -*- coding: utf-8 -*-
 import glob
 import os, sys
@@ -176,7 +180,7 @@ def main(args):
                 imagename = data_mid.get("imagename", "")
                 frame_id = extract_frame_index(imagename)
 
-                # 원본은 중앙 프레임만
+                # 원본은 중앙    프레임만
                 img_mid = images[half:half+1]
 
                 with torch.no_grad():
@@ -213,6 +217,7 @@ def main(args):
                         score_img = sigmoid_np(score_img)
                         score_det = sigmoid_np(score_det)
 
+                    # 0 1 구분되기 이전의 값 기록하기
                     row = [name, frame_id, imagename]
                     row += score_img.tolist()
                     row += score_det.tolist()
