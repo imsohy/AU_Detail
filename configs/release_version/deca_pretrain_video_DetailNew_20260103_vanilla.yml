@@ -1,4 +1,4 @@
-# 실험일자:20260110
+# 실험일자 20260110 vanilla mode
 # ============================================================================
 # 학습 방법 가이드 (Training Guide)
 # ============================================================================
@@ -24,7 +24,7 @@
 #
 #
 # '''
-output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNew_20260104/"
+output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNew_20260103/"
 pretrained_modelpath: ''
 pretrained_coarse_modelpath: '/media/cine/First/HJCode2/AUSequence/Training1_videoC_OnlyE_AULossF/pretrain2/model.tar'
 #model_path_HJ: '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'
@@ -70,12 +70,12 @@ loss:
   subAU: 0.25
   weightedAU: False
   focalAU: False
-#mrf = 5e-2
-#photo_D = 2.
-#reg_sym = 0.005
-#reg_z = 0.005
-#reg_diff = 0.005
-#au_D = 0.0
+#photo_D:2.
+#mrf:5e-2
+#reg_sym:0.005
+#reg_z:0.005
+#reg_diff:0.005
+#au_D:0.0
 
 train:
   # 학습 모드 설정 (최소 하나는 True여야 함)
