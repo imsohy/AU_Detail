@@ -194,17 +194,26 @@ class DECA(nn.Module):
         else:
             print(f'Warning: Original DECA model not found at {model_path_224}. D_detail_original will not be initialized correctly.')
 
-        # 2. Load other modules from either trained model (model_path) or fallback (model_path_224)
-        if os.path.exists(model_path):  # if trained model exists (e.g. during Demo)
+        # 2. [Safe Loading] Load other modules from either trained model (model_path) or fallback (model_path_224)
+        if os.path.exists(model_path):  # if trained model exists (e.g. during Demo or Resume)
             print(f'trained model found. load {model_path}')
             checkpoint = torch.load(model_path)
             self.checkpoint = checkpoint
-            util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
-            util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
-            util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
+            
+            # Safe loading: Only load if key exists in checkpoint
+            if 'E_flame' in checkpoint: util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
+            if 'E_detail' in checkpoint: util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
+            
+            if 'D_detail' in checkpoint:
+                util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
+                print('  D_detail loaded from checkpoint.')
+            else:
+                print('  D_detail not found in checkpoint, keeping original weights from memory.')
+            
             # DO NOT load D_detail_original from here, it should remain original
-            util.copy_state_dict(self.ViTDetail.state_dict(), checkpoint['ViTDetail'])
-            util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
+            
+            if 'ViTDetail' in checkpoint: util.copy_state_dict(self.ViTDetail.state_dict(), checkpoint['ViTDetail'])
+            if 'BiViT' in checkpoint: util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
             
             parameters = self.E_flame.state_dict()
             self.weight = parameters['layers.0.weight']
