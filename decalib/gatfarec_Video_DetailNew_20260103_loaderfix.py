@@ -1,8 +1,6 @@
 """
-2026 01 04
-copied from: decalib/gatfarec_Video_DetailNew_20260103.py
-교수님의 말 대로, vit에다가 shape 파라미터를 추가해서 학습시킨다.
-Global latent feature 대신 shape parameter 100차원을 사용해보려고 한다.
+# 변겨사항: 디테ㅣㄹ 디코더를 분리해서, 파인튜닝 시에도
+기존 DECA디코더는 예전 값을 뽑아내도록 함.
 """
 import os, sys
 import torch
@@ -34,7 +32,7 @@ from .models.OpenGraphAU.utils import *
 from .models.OpenGraphAU.conf import get_config, set_logger, set_outdir, set_env
 from .models.vitVideo import ViTEncoderV
 from .models.vitVideo_Sequence_Cross_WT import ViTEncoderSeque
-from .models.ViTVideoSequence_DetailNew_20260104 import ViTDetailEncoderSeque
+from .models.ViTVideoSequence_DetailNewBranch import ViTDetailEncoderSeque
 
 # from .models.gat import GAT
 
@@ -194,17 +192,26 @@ class DECA(nn.Module):
         else:
             print(f'Warning: Original DECA model not found at {model_path_224}. D_detail_original will not be initialized correctly.')
 
-        # 2. Load other modules from either trained model (model_path) or fallback (model_path_224)
-        if os.path.exists(model_path):  # if trained model exists (e.g. during Demo)
+        # 2. [Safe Loading] Load other modules from either trained model (model_path) or fallback (model_path_224)
+        if os.path.exists(model_path):  # if trained model exists (e.g. during Demo or Resume)
             print(f'trained model found. load {model_path}')
             checkpoint = torch.load(model_path)
             self.checkpoint = checkpoint
-            util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
-            util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
-            util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
+            
+            # Safe loading: Only load if key exists in checkpoint
+            if 'E_flame' in checkpoint: util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
+            if 'E_detail' in checkpoint: util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
+            
+            if 'D_detail' in checkpoint:
+                util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
+                print('  D_detail loaded from checkpoint.')
+            else:
+                print('  D_detail not found in checkpoint, keeping original weights from base model.')
+            
             # DO NOT load D_detail_original from here, it should remain original
-            util.copy_state_dict(self.ViTDetail.state_dict(), checkpoint['ViTDetail'])
-            util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
+            
+            if 'ViTDetail' in checkpoint: util.copy_state_dict(self.ViTDetail.state_dict(), checkpoint['ViTDetail'])
+            if 'BiViT' in checkpoint: util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
             
             parameters = self.E_flame.state_dict()
             self.weight = parameters['layers.0.weight']
@@ -319,20 +326,13 @@ class DECA(nn.Module):
             parameters_ours = torch.unsqueeze(parameters_ours, 0)
 
         #detail transformer
-        #afn, shape, detail
+        #afn, detail
         # -> ViTDetail (parameters_detail_ours)
         # Performance optimization: GPU 하나만 사용하므로 device_detail로 이동 제거
-
-        # patch 20250104
-        # shape_seq 추출: parameters_224에서 앞 100차원만 슬라이싱 (middleframe 자르기 전!)
-        shape_seq = parameters_224[:, :self.cfg.model.n_shape]  # (T, 100)
-
         detailcode_ours = self.ViTDetail(
-            afn,  
-            shape_seq, # FLAME shape parameter 100바로 삽입
+            afn,  # 같은 device이므로 이동 불필요
             detail_feature
         )
-
         if detailcode_ours.shape[0] > 1:
             detailcode_ours = torch.unsqueeze(detailcode_ours, 0)
 
@@ -348,7 +348,7 @@ class DECA(nn.Module):
         codedict['detail'] = detailcode_old
         codedict_our['detail'] = detailcode_ours
 
-        #우리의 파라미터 대신, 올드 파라미터를 덮어쓰겠다는 장면.
+        # Performance optimization: 이미 GPU에 있으므로 .to() 불필요
         codedict['images'] = images_224[self.middleframe:self.middleframe + 1]
         codedict_our['images'] = images_224[self.middleframe:self.middleframe + 1]
 
@@ -442,10 +442,6 @@ class DECA(nn.Module):
             if self.cfg.model.use_tex:
                 opdict['albedo'] = albedo
                 opdict['albedo_old'] = albedo_old
-
-
-
-            #ORiginal deca detail render.
 
             #original code: if use_detail...
             #DECA original detail render
