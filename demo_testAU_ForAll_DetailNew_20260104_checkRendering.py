@@ -54,19 +54,34 @@ def main(args):
     subdirs = sorted(subdirs)  # Sort for consistent processing order
     
     if len(subdirs) == 0:
-        print(f"Warning: No subdirectories found in {base_inputpath}")
-        return
+        # If no subdirectories, check if there are images in the current directory
+        files = os.listdir(base_inputpath)
+        image_extensions = ['.jpg', '.jpeg', '.png', '.ppm', '.bmp']
+        has_images = any(any(f.lower().endswith(ext) for ext in image_extensions) for f in files)
+        
+        if has_images:
+            print(f"No subdirectories found, but images detected in {base_inputpath}. Processing as a single directory.")
+            subdirs = [''] # Process the base directory itself
+        else:
+            print(f"Warning: No subdirectories or images found in {base_inputpath}")
+            return
     
-    print(f"Found {len(subdirs)} directories to process: {subdirs}")
+    print(f"Found {len(subdirs) if subdirs != [''] else 1} directory(s) to process.")
     
     # Process each directory
     for dir_name in subdirs:
-        inputpath = os.path.join(base_inputpath, dir_name)
-        savefolder = os.path.join(base_savefolder, dir_name)
+        if dir_name == '':
+            inputpath = base_inputpath
+            # For savefolder, use the last part of inputpath if possible
+            folder_name = os.path.basename(base_inputpath.strip('/'))
+            savefolder = base_savefolder # Use the base save folder directly
+        else:
+            inputpath = os.path.join(base_inputpath, dir_name)
+            savefolder = os.path.join(base_savefolder, dir_name)
+        
         os.makedirs(savefolder, exist_ok=True)
         
-        print(f"\nProcessing directory: {dir_name}")
-        print(f"Input path: {inputpath}")
+        print(f"\nProcessing: {inputpath}")
         print(f"Save folder: {savefolder}")
 
         # load test images
@@ -80,7 +95,11 @@ def main(args):
             
         fourcc = cv2.VideoWriter_fourcc(*'MP4V')
         # 3행 3열 레이아웃: 각 이미지 448x448, 가로 3개, 세로 3개
-        vidoname = dir_name if args.vidoname == 'Actor_03sad' else args.vidoname
+        if dir_name == '':
+            vidoname = args.vidoname
+        else:
+            vidoname = dir_name if args.vidoname == 'Actor_03sad' else args.vidoname
+        
         out = cv2.VideoWriter(os.path.join(savefolder, vidoname + ".mp4"), fourcc, 30, (448 * 3, 448 * 3), True)
         # run DECA
         deca_cfg.model.use_tex = args.useTex
