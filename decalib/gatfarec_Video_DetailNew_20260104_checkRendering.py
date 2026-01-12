@@ -514,18 +514,35 @@ class DECA(nn.Module):
             _diff_light = torch.max(torch.abs(_capture_light - codedict['light']))
             _diff_verts = torch.max(torch.abs(_capture_verts - verts))
             
+            # 교수님 보고용 상세 로그 구성
+            verification_msg = (
+                f"\n{'='*60}\n"
+                f"[Rendering Input Identity Verification]\n"
+                f"Checking if the source data for Coarse and Detail paths are identical.\n"
+                f"{'-'*60}\n"
+                f"1. Albedo Map (Texture):\n"
+                f"   - Coarse Sample [0,:,0,0]: {_capture_albedo[0, :, 0, 0].cpu().numpy()}\n"
+                f"   - Detail Sample [0,:,0,0]: {albedo[0, :, 0, 0].cpu().numpy()}\n"
+                f"   - Max Difference: {_diff_albedo.item():.8f}\n\n"
+                f"2. Light Coefficients (SH):\n"
+                f"   - Coarse Sample [0,0,:]:  {_capture_light[0, 0, :].cpu().numpy()}\n"
+                f"   - Detail Sample [0,0,:]:  {codedict['light'][0, 0, :].cpu().numpy()}\n"
+                f"   - Max Difference: {_diff_light.item():.8f}\n\n"
+                f"3. 3D Vertices (Geometry):\n"
+                f"   - Coarse Sample [0,0,:]:  {_capture_verts[0, 0, :].cpu().numpy()}\n"
+                f"   - Detail Sample [0,0,:]:  {verts[0, 0, :].cpu().numpy()}\n"
+                f"   - Max Difference: {_diff_verts.item():.8f}\n"
+                f"{'='*60}\n"
+            )
+
             if _diff_albedo > 0 or _diff_light > 0 or _diff_verts > 0:
-                msg = (f"\n[CheckRendering Warning] Identity Mismatch Detected!\n"
-                       f" > Albedo Max Diff: {_diff_albedo.item():.8f}\n"
-                       f" > Light Max Diff:  {_diff_light.item():.8f}\n"
-                       f" > Verts Max Diff:  {_diff_verts.item():.8f}")
-                print(msg)
-                self._write_to_log(msg)
+                print(f"\n!!! [WARNING] IDENTITY MISMATCH DETECTED !!!")
+                print(verification_msg)
+                self._write_to_log("WARNING: Identity Mismatch\n" + verification_msg)
             else:
                 if getattr(self, 'print_count', 0) % 50 == 0:
-                    msg = f"\n[CheckRendering Success] Inputs for Coarse and Detail are IDENTICAL (Max Diff: 0.0)"
-                    print(msg)
-                    self._write_to_log(msg)
+                    print(verification_msg)
+                    self._write_to_log("SUCCESS: Identity Confirmed\n" + verification_msg)
                 self.print_count = getattr(self, 'print_count', 0) + 1
 
             uv_shading = self.render.add_SHlight(uv_detail_normals, codedict['light'])
