@@ -531,18 +531,6 @@ class DECA(nn.Module):
             uv_shading = self.render.add_SHlight(uv_detail_normals, codedict['light'])
             uv_texture = albedo * uv_shading
 
-    def _write_to_log(self, message):
-        """지정된 로그 파일에 메시지를 기록하는 헬퍼 함수"""
-        log_file = getattr(self, 'verification_log_path', None)
-        if log_file:
-            try:
-                with open(log_file, 'a', encoding='utf-8') as f:
-                    from datetime import datetime
-                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    f.write(f"[{timestamp}] {message}\n")
-            except Exception as e:
-                print(f"Failed to write to log file: {e}")
-
             # 우리 detail 결과를 opdict에 저장 (기본 키, loss 계산용)
             opdict['uv_texture'] = uv_texture
             opdict['albedo'] = albedo
@@ -678,6 +666,18 @@ class DECA(nn.Module):
                 return opdict, visdict
 
             return opdict
+
+    def _write_to_log(self, message):
+        """지정된 로그 파일에 메시지를 기록하는 헬퍼 함수"""
+        log_file = getattr(self, 'verification_log_path', None)
+        if log_file:
+            try:
+                from datetime import datetime
+                with open(log_file, 'a', encoding='utf-8') as f:
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    f.write(f"[{timestamp}] {message}\n")
+            except Exception as e:
+                print(f"Failed to write to log file: {e}")
 
     # @torch.no_grad()
 
