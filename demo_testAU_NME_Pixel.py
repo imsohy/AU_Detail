@@ -298,6 +298,23 @@ def main(args):
             data = testdata[i]
             data_3 = testdata[i + 1]
             name = data['imagename']
+            imagepath = data['imagepath']  # 전체 경로 가져오기
+            
+            # 서브디렉토리 정보 추출
+            # 예: /home/cine/Downloads/AFEW-VA/croppedImages/01/001/00001.jpg
+            #     inputpath = /home/cine/Downloads/AFEW-VA/croppedImages/01
+            #     -> rel_path = 001/00001.jpg
+            rel_path = os.path.relpath(imagepath, inputpath)  # inputpath 기준 상대 경로
+            rel_dir = os.path.dirname(rel_path)  # 001 (서브디렉토리명)
+            filename_without_ext = os.path.splitext(os.path.basename(rel_path))[0]  # 00001
+            
+            # 서브디렉토리 정보를 포함한 이름 생성
+            if rel_dir and rel_dir != '.':
+                # 서브디렉토리가 있는 경우: 001_00001
+                error_map_name = f"{rel_dir}_{filename_without_ext}"
+            else:
+                # 서브디렉토리가 없는 경우: 00001 (기존과 동일)
+                error_map_name = filename_without_ext
             
             images = torch.cat((data_1['image'][None, ...], data['image'][None, ...], data_3['image'][None, ...]), 0).to(device)
             
@@ -330,7 +347,7 @@ def main(args):
                 
                 # Error map 저장 (옵션)
                 if args.saveErrorMap:
-                    error_map_path = os.path.join(savefolder, 'error_maps', name + '_error_map.npy')
+                    error_map_path = os.path.join(savefolder, 'error_maps', error_map_name + '_error_map.npy')
                     np.save(error_map_path, pixel_errors)
                     
                     # 시각화용 이미지로도 저장
@@ -338,7 +355,7 @@ def main(args):
                         error_map_vis = (pixel_errors / pixel_errors.max() * 255).astype(np.uint8)
                     else:
                         error_map_vis = np.zeros_like(pixel_errors, dtype=np.uint8)
-                    cv2.imwrite(os.path.join(savefolder, 'error_maps', name + '_error_map.jpg'), 
+                    cv2.imwrite(os.path.join(savefolder, 'error_maps', error_map_name + '_error_map.jpg'), 
                                error_map_vis)
                 
             except Exception as e:
