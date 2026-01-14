@@ -208,20 +208,24 @@ def extract_generated_image(opdict, visdict, image_type='render_images_with_deta
     # 텐서의 첫 번째 차원 크기 확인
     batch_size = image_tensor.shape[0]
     
-    # 배치 크기에 따라 적절한 인덱스 선택
+    # 배치 크기에 따라 적절한 인덱스 선택 (항상 middle frame 우선)
     if batch_size == 1:
-        # 배치 크기가 1이면 인덱스 0만 사용 가능
-        generated_image = image_tensor[0]  # [C, H, W]
-    elif batch_size >= 3:
-        # 배치 크기가 3 이상이면 frame_idx 사용
-        if frame_idx >= batch_size:
-            # frame_idx가 범위를 벗어나면 마지막 프레임 사용
-            generated_image = image_tensor[-1]  # [C, H, W]
-        else:
-            generated_image = image_tensor[frame_idx]  # [C, H, W]
+        # 배치 크기가 1이면 인덱스 0만 사용 가능 (유일한 프레임 = middle)
+        selected_idx = 0
+    elif batch_size == 2:
+        # 배치 크기가 2면 인덱스 1 사용 (middle frame)
+        selected_idx = 1
     else:
-        # 배치 크기가 2인 경우 (드물지만)
-        generated_image = image_tensor[min(frame_idx, batch_size - 1)]  # [C, H, W]
+        # 배치 크기가 3 이상이면 middle frame 사용
+        # batch_size가 3이면 인덱스 1, 5면 인덱스 2 (중간)
+        middle_idx = batch_size // 2
+        # frame_idx가 범위 내에 있으면 사용, 아니면 middle_idx 사용
+        if 0 <= frame_idx < batch_size:
+            selected_idx = frame_idx
+        else:
+            selected_idx = middle_idx  # middle frame 사용
+    
+    generated_image = image_tensor[selected_idx]  # [C, H, W]
     
     return generated_image
 
