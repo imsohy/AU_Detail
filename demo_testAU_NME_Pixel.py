@@ -195,11 +195,11 @@ def extract_generated_image(opdict, visdict, image_type='render_images_with_deta
     Returns:
         generated_image: [C, H, W] tensor
     """
-    # visdict에서 먼저 찾기
+    # visdict 또는 opdict에서 텐서 가져오기 (인덱싱 없이 먼저 가져오기)
     if image_type in visdict:
-        generated_image = visdict[image_type][frame_idx]  # [C, H, W]
+        image_tensor = visdict[image_type]  # [B, C, H, W] 또는 [1, C, H, W]
     elif image_type in opdict:
-        generated_image = opdict[image_type][frame_idx]  # [C, H, W]
+        image_tensor = opdict[image_type]  # [B, C, H, W] 또는 [1, C, H, W]
     else:
         available_keys = list(visdict.keys()) + list(opdict.keys())
         raise ValueError(f"Image type '{image_type}' not found in opdict or visdict. "
