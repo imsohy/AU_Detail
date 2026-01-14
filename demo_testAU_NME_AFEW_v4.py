@@ -149,11 +149,10 @@ def calculate_nme(predicted_landmarks, gt_landmarks, normalization='inter-ocular
                 right_eye = gt_i[right_eye_idx, :]
                 norm_factor = np.linalg.norm(left_eye - right_eye)
             else:
-                # Fallback: use bounding box diagonal if eye indices are invalid
-                bbox_min = gt_i.min(axis=0)
-                bbox_max = gt_i.max(axis=0)
-                norm_factor = np.linalg.norm(bbox_max - bbox_min)
-                print(f"Warning: Using bbox diagonal for normalization (landmark count: {gt_i.shape[0]})")
+                # 경고를 출력하고 샘플을 스킵
+                if args.verbose:
+                    print(f"Warning: Eye indices invalid, skipping sample (landmark count: {gt_i.shape[0]})")
+                return None  # 또는 continue로 스킵
         
         elif normalization == 'inter-pupil':
             # Similar to inter-ocular but using pupil centers
@@ -559,4 +558,3 @@ if __name__ == '__main__':
                         type=lambda x: x.lower() in ['true', '1'],
                         help='whether to print verbose messages')
     main(parser.parse_args())
-
