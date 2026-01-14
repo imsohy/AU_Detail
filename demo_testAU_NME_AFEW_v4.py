@@ -344,7 +344,7 @@ def main(args):
                 opdict, visdict = deca.decode(codedict, codedict_old, use_detail=True)
             
             # 예측된 landmark 추출 (middle frame만 사용)
-            predicted_landmarks = opdict['landmarks2d'][0]  # [K, 2] - middle frame의 landmark
+            predicted_landmarks = opdict['landmarks2d'][1]  # [K, 2] - middle frame의 landmark
             
             # GT landmark 로드 (AFEW-VA 구조 사용)
             gt_landmark_path = get_gt_landmark_path_afew(imagepath, base_inputpath, landmarkDir_GT)
@@ -559,3 +559,4 @@ if __name__ == '__main__':
                         type=lambda x: x.lower() in ['true', '1'],
                         help='whether to print verbose messages')
     main(parser.parse_args())
+
