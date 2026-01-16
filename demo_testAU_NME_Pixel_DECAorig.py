@@ -38,7 +38,7 @@ import json
 import glob
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
-from decalib.gatfarec_Video_DetailNew_20260103 import DECA
+from decalib.gatfarec_Video_DetailNew_20260103_DECANME import DECA
 from decalib.datasets import datasets2 as datasets
 from decalib.utils import util
 from decalib.utils.config_wt_DetailNew_20260103 import cfg as deca_cfg
@@ -488,10 +488,10 @@ if __name__ == '__main__':
     
     # Pixel NME 관련 인자들 - 원본 DECA 결과 옵션
     parser.add_argument('--image_type', 
-                        default='shape_detail_images_old', 
+                        default='render_images_old', 
                         type=str,
-                        choices=['shape_detail_images_old', 'shape_images_old', 
-                                'render_images_old', 'rendered_images_old',
+                        choices=['render_images_old', 'shape_detail_images_old', 'shape_images_old', 
+                                'rendered_images_old',
                                 'shape_detail_images_full_old', 'shape_images_full_old'],
                         help='Type of generated image to compare (Original DECA results with _old suffix)')
     parser.add_argument('--pixel_normalization', 
