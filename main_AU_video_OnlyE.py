@@ -52,7 +52,7 @@ if __name__ == '__main__':
     from decalib.utils.config import parse_args
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "3,2"
-    cfg = parse_args(cfg_name='configs/release_version/deca_pretrain_video_OnlyE2.yml')
+    cfg = parse_args(cfg_name='configs/release_version/deca_pretrain_video_OnlyE.yml')
     # os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
     # cfg = parse_args(cfg_name='configs/release_version/deca_detail.yml')
     

@@ -38,7 +38,7 @@ def main(cfg):
     #     trainer = Trainer(model=mymodel, config=cfg, device=cfg.device)
     # else:
     from decalib.gatfarec_Video_OnlyExpress import DECA
-    from decalib.trainer_Video_OnlyExpress import Trainer
+    from decalib.trainer_Video_OnlyExpress_MEAD import Trainer
     cfg.rasterizer_type = 'pytorch3d'
     cfg.device = 'cuda:1'
     mymodel = DECA(cfg)
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     from decalib.utils.config import parse_args
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
-    cfg = parse_args(cfg_name='configs/release_version/deca_pretrain_video_OnlyE2.yml')
+    cfg = parse_args(cfg_name='configs/release_version/deca_pretrain_video_OnlyE_MEAD70.yml')
     # os.environ["CUDA_VISIBLE_DEVICES"] = "2,3"
     # cfg = parse_args(cfg_name='configs/release_version/deca_detail.yml')
     

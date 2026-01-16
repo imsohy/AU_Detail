@@ -1,9 +1,108 @@
+# IDE and Editor
 /.idea/
-/decalib/models/OpenGraphAU/
-/data/
-__pycache__/
-*.pyc
-/sort/
+/.vscode/
 /.cursor/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# Data folders (large files)
+/data/
+/assets/
+/external/
+/gdl_apps/
+/sort/
+
+# Model checkpoints and weights
+*.ckpt
+*.pth
+*.pkl
+*.h5
+*.hdf5
+*.pt
+*.safetensors
+
+# Large data files
+*.npy
+*.npz
+*.mat
+*.bin
+
+# Video and image data (keep structure, ignore large files)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.jpg
+*.jpeg
+*.png
+!assets/**/*.png  # Keep small asset images if needed
+!assets/**/*.jpg
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Logs and temporary files
+*.log
+*.out
+*.err
+
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# MyPy
 /.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Legacy code folders
 /AU_Sequence codecopy/
+/Unusing codes/
+
+# Configuration files with sensitive data
+*.key
+*.pem
+.env
+.env.local
+
+# Large text files (data lists)
+data30_*.txt
+
+# Temporary and backup files
+*.bak
+*.tmp
+*.temp
+*~
