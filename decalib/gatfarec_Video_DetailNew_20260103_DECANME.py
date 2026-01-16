@@ -201,8 +201,15 @@ class DECA(nn.Module):
             util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
             util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
             # DO NOT load D_detail_original from here, it should remain original
-            util.copy_state_dict(self.ViTDetail.state_dict(), checkpoint['ViTDetail'])
-            util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
+            if 'ViTDetail' in checkpoint:
+                util.copy_state_dict(self.ViTDetail.state_dict(), checkpoint['ViTDetail'])
+            else:
+                print('  Warning: ViTDetail not found in checkpoint, using initialized weights.')
+    
+            if 'BiViT' in checkpoint:
+                util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
+            else:
+                print('  Warning: BiViT not found in checkpoint, using initialized weights.')
             
             parameters = self.E_flame.state_dict()
             self.weight = parameters['layers.0.weight']
