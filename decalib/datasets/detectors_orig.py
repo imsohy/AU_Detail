@@ -12,12 +12,12 @@
 #
 # For comments or questions, please email us at deca@tue.mpg.de
 # For commercial licensing contact, please contact ps-license@tuebingen.mpg.de
-from sort.sort import *
+# from sort.sort import *
 import numpy as np
-# class FAN(object):
-#     def __init__(self, type):
-#         import face_alignment
-#         self.model = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False)
+class FAN(object):
+    def __init__(self, type):
+        import face_alignment
+        self.model = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, flip_input=False)
 #         # self.model = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=False,face_detector = 'blazeface' )
 #         self.preKpt = []
 #         self.scale = 1.6
@@ -27,12 +27,13 @@ import numpy as np
 #     def lmk(self, image):
 #         out = self.model.get_landmarks(image)
 #
-#     def run(self,image):
+    def run(self,image):
 #         '''
 #         image: 0-255, uint8, rgb, [h, w, 3]
 #         return: detected box list
 #         '''
-#         out = self.model.get_landmarks(image)
+        out = self.model.get_landmarks(image)
+        return out
 #         h,w,_= image.shape
 #         lenMax = max(h,w)
 #         bboxes = []
@@ -67,7 +68,7 @@ class RetinaFace:
         from retinaface import RetinaFace
         self.face_detector = RetinaFace()
         self.type = type
-        self.mot_tracker = Sort()
+        # self.mot_tracker = Sort()
 
     def run(self, image):
         obj = self.face_detector.predict(rgb_image=image, threshold=0.9)
@@ -81,12 +82,12 @@ class RetinaFace:
         bottom = identity['y2']
         bbox = [left, top, right, bottom]
 
-        if self.type =='video':
-            bboxes = []
-            for identity in obj:
-                bboxes.append([identity['x1'], identity['y1'],identity['x2'], identity['y2']])
-            track_bbs_ids = self.mot_tracker.update(np.array(bboxes))  # !!!
-            bbox = track_bbs_ids[0, :4]
+        # if self.type =='video':
+        #     bboxes = []
+        #     for identity in obj:
+        #         bboxes.append([identity['x1'], identity['y1'],identity['x2'], identity['y2']])
+        #     track_bbs_ids = self.mot_tracker.update(np.array(bboxes))  # !!!
+        #     bbox = track_bbs_ids[0, :4]
             # bbox = track_bbs_ids[-1, :4]
             # bbox = track_bbs_ids[0, :4]
         return bbox, 'bbox'

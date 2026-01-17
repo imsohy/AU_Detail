@@ -581,7 +581,8 @@ def dict_tensor2npy(tensor_dict):
     return npy_dict
         
 # ---------------------------------- visualization
-end_list = np.array([17, 22, 27, 42, 48, 31, 36, 68], dtype = np.int32) - 1
+# end_list = np.array([17, 22, 27, 42, 48, 31, 36, 68], dtype = np.int32) - 1
+end_list = np.array([ 22-17, 27-17, 42-17, 48-17, 31-17, 36-17, 68-17], dtype = np.int32) - 1
 def plot_kpts(image, kpts, color = 'r'):
     ''' Draw 68 key points
     Args: 
@@ -619,11 +620,11 @@ def plot_verts(image, kpts, color = 'r'):
         kpt: (68, 3).
     '''
     if color == 'r':
-        c = (255, 0, 0)
+        c = (0, 0, 255)
     elif color == 'g':
         c = (0, 255, 0)
     elif color == 'b':
-        c = (0, 0, 255)
+        c = (255, 0, 0)
     elif color == 'y':
         c = (0, 255, 255)
     image = image.copy()
@@ -651,14 +652,18 @@ def tensor_vis_landmarks(images, landmarks, gt_landmarks=None, color = 'g', isSc
             predicted_landmark[...,1] = predicted_landmark[...,1]*image.shape[0]/2 + image.shape[0]/2
         else:
             predicted_landmark = predicted_landmarks[i]
-        if predicted_landmark.shape[0] == 68:
-            image_landmarks = plot_kpts(image, predicted_landmark, color)
-            if gt_landmarks is not None:
-                image_landmarks = plot_verts(image_landmarks, gt_landmarks_np[i]*image.shape[0]/2 + image.shape[0]/2, 'r')
-        else:
-            image_landmarks = plot_verts(image, predicted_landmark, color)
-            if gt_landmarks is not None:
-                image_landmarks = plot_verts(image_landmarks, gt_landmarks_np[i]*image.shape[0]/2 + image.shape[0]/2, 'r')
+        # if predicted_landmark.shape[0] == 68:
+        #     image_landmarks = plot_kpts(image, predicted_landmark, color)
+        #     if gt_landmarks is not None:
+        #         image_landmarks = plot_verts(image_landmarks, gt_landmarks_np[i]*image.shape[0]/2 + image.shape[0]/2, 'r')
+        # else:
+        # image_landmarks = plot_kpts(image, predicted_landmark, 'g')
+        # if gt_landmarks is not None:
+        #     image_landmarks = plot_kpts(image_landmarks, gt_landmarks_np[i]*image.shape[0]/2 + image.shape[0]/2, 'r')
+        image_landmarks = plot_kpts(image, predicted_landmark[17:], 'g')
+        if gt_landmarks is not None:
+            gt_landmark_np = gt_landmarks_np[i][17:]
+            image_landmarks = plot_kpts(image_landmarks, gt_landmark_np*image.shape[0]/2 + image.shape[0]/2, 'r')
         vis_landmarks.append(image_landmarks)
 
     vis_landmarks = np.stack(vis_landmarks)

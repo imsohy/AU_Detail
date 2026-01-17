@@ -13,13 +13,13 @@ cfg.deca_dir = abs_deca_dir
 cfg.device = 'cuda:1'
 cfg.device_id = '0,1'
 
-# cfg.pretrained_modelpath = "./data/model_new.tar"
+# cfg.pretrained_modelpath = "/home/cine/Documents/HJCode/AU_sequence/data/model_new.tar"
 cfg.pretrained_modelpath = ""
-# cfg.pretrained_modelpath = "./data/model_new.tar"
-cfg.pretrained_modelpath_224 = "./data/deca_model.tar"
-# cfg.pretrained_modelpath_224 = "./data/EMOCAdeca_model.tar"
+# cfg.pretrained_modelpath = "/home/cine/Documents/HJCode/AU_sequence/data/model_new.tar"
+cfg.pretrained_modelpath_224 = "/home/cine/Documents/HJCode/AU_sequence/data/deca_model.tar"
+# cfg.pretrained_modelpath_224 = "/home/cine/Documents/HJCode/AU_sequence/data/EMOCAdeca_model.tar"
 # cfg.pretrained_modelpath_224 = "/media/cine/de6afd1d-c444-4d43-a787-079519ace719/LGAI/emoca/assets/EMOCA/models/EMOCA_v2_lr_mse_20/detail/checkpoints/deca-epoch=10-val_loss/dataloader_idx_0=3.25521111.ckpt"
-cfg.emotion_checkpoint ='./data/dataloader_idx_0=1.27607644.ckpt'
+cfg.emotion_checkpoint ='/home/cine/Documents/HJCode/AU_sequence/data/dataloader_idx_0=1.27607644.ckpt'
 
 cfg.model_path_HJ = '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'
 cfg.output_dir = ''
@@ -28,36 +28,39 @@ cfg.rasterizer_type = 'pytorch3d' #
 # Options for Face model
 # ---------------------------------------------------------------------------- #
 cfg.model = CN()
-cfg.model.topology_path = './data/head_template.obj'
+cfg.model.topology_path = '/home/cine/Documents/HJCode/AU_sequence/data/head_template.obj'
 # texture data original from http://files.is.tue.mpg.de/tbolkart/FLAME/FLAME_texture_data.zip
-cfg.model.dense_template_path = './data/texture_data_256.npy'
-cfg.model.fixed_displacement_path = './data/fixed_displacement_256.npy'
-cfg.model.flame_model_path = './data/generic_model.pkl'
-# cfg.model.flame_model_path = './data/flame2023.pkl' # FLAME 2023
-cfg.model.flame_lmk_embedding_path = './data/landmark_embedding.npy'
-cfg.model.mp_lmk_embedding_path = './data/mediapipe_landmark_embedding.npz'
-cfg.model.flame_mask_path = './data/FLAME_masks.pkl'
-cfg.model.face_mask_path = './data/uv_face_mask.png'
-cfg.model.face_eye_mask_path = './data/uv_face_eye_mask.png'
-cfg.model.mean_tex_path = './data/mean_texture.jpg'
+cfg.model.dense_template_path = '/home/cine/Documents/HJCode/AU_sequence/data/texture_data_256.npy'
+cfg.model.fixed_displacement_path = '/home/cine/Documents/HJCode/AU_sequence/data/fixed_displacement_256.npy'
+cfg.model.flame_model_path = '/home/cine/Documents/HJCode/AU_sequence/data/generic_model.pkl'
+# cfg.model.flame_model_path = '/home/cine/Documents/HJCode/AU_sequence/data/flame2023.pkl' # FLAME 2023
+cfg.model.flame_lmk_embedding_path = '/home/cine/Documents/HJCode/AU_sequence/data/landmark_embedding.npy'
+cfg.model.mp_lmk_embedding_path = '/home/cine/Documents/HJCode/AU_sequence/data/mediapipe_landmark_embedding.npz'
+cfg.model.flame_mask_path = '/home/cine/Documents/HJCode/AU_sequence/data/FLAME_masks.pkl'
+cfg.model.face_mask_path = '/home/cine/Documents/HJCode/AU_sequence/data/uv_face_mask.png'
+cfg.model.face_eye_mask_path = '/home/cine/Documents/HJCode/AU_sequence/data/uv_face_eye_mask.png'
+cfg.model.mean_tex_path = '/home/cine/Documents/HJCode/AU_sequence/data/mean_texture.jpg'
 # cfg.model.flame_tex_path = '/home/cine/Downloads/TextureSpace/FLAME_texture.npz'
-cfg.model.tex_path = './data/FLAME_albedo_from_BFM.npz'
-cfg.model.pretrained_modelpath_albedo = "./data/TRUST_models_BalanceAlb_version/E_albedo_BalanceAlb.tar"
-cfg.model.pretrained_modelpath_facel = "./data/TRUST_models_BalanceAlb_version/E_face_light_BalanceAlb.tar"
-cfg.model.pretrained_modelpath_scene = "./data/TRUST_models_BalanceAlb_version/E_scene_light_BalanceAlb.tar"
-cfg.model.lightprobe_normal_path = "./data/lightprobe_normal_images.npy"
-cfg.model.lightprobe_albedo_path = "./data/lightprobe_albedo_images.npy"
-cfg.model.BalanceAlb_tex_path= './data/BalanceAlb_model.npz'
+cfg.model.tex_path = '/home/cine/Documents/HJCode/AU_sequence/data/FLAME_albedo_from_BFM.npz'
+cfg.model.pretrained_modelpath_albedo = "/home/cine/Documents/HJCode/AU_sequence/data/TRUST_models_BalanceAlb_version/E_albedo_BalanceAlb.tar"
+cfg.model.pretrained_modelpath_facel = "/home/cine/Documents/HJCode/AU_sequence/data/TRUST_models_BalanceAlb_version/E_face_light_BalanceAlb.tar"
+cfg.model.pretrained_modelpath_scene = "/home/cine/Documents/HJCode/AU_sequence/data/TRUST_models_BalanceAlb_version/E_scene_light_BalanceAlb.tar"
+cfg.model.lightprobe_normal_path = "/home/cine/Documents/HJCode/AU_sequence/data/lightprobe_normal_images.npy"
+cfg.model.lightprobe_albedo_path = "/home/cine/Documents/HJCode/AU_sequence/data/lightprobe_albedo_images.npy"
+cfg.model.BalanceAlb_tex_path= '/home/cine/Documents/HJCode/AU_sequence/data/BalanceAlb_model.npz'
 
-cfg.model.flame_tex_path = os.path.join(cfg.deca_dir, 'data', 'FLAME_texture.npz')
-cfg.model.tex_type = 'FLAME' # BFM, FLAME, albedoMM
-# cfg.model.BFM_tex_path = './data/FLAME_texture.npz'
+# cfg.model.flame_tex_path = "/home/cine/Documents/HJCode/AU_sequence/data/FLAME_texture.npz"
+# cfg.model.tex_type = 'FLAME' # BFM, FLAME, albedoMM
+cfg.model.tex_type = 'BFM' # BFM, FLAME, albedoMM
+cfg.model.BFM_tex_path = '/home/cine/Documents/HJCode/AU_sequence/data/FLAME_albedo_from_BFM.npz'
+# cfg.model.BFM_tex_path = '/home/cine/Documents/HJCode/AU_sequence/data/FLAME_albedo_from_BFM.npz'
 # cfg.model.tex_type = 'BalanceAlb' # BFM, FLAME, albedoMM, BalanceAlb
 cfg.model.uv_size = 256
 cfg.model.image_size = 224
 cfg.model.param_list = ['shape', 'tex', 'exp', 'pose', 'cam', 'light']
 cfg.model.param_list_part = [ 'tex', 'exp', 'jaw_pose', 'light']
-cfg.model.param_list_OnlyE = [ 'tex', 'exp', 'light']
+# cfg.model.param_list_OnlyE = [ 'tex', 'exp', 'light']
+cfg.model.param_list_OnlyE = [ 'exp']
 # cfg.model.param_list_OnlyE = [  'exp', 'light']
 # cfg.model.param_list_EandJ = [  'exp', 'jaw_pose', 'light']
 cfg.model.param_list_EandJT = [  'tex', 'exp', 'jaw_pose', 'light']
@@ -77,7 +80,7 @@ cfg.model.use_tex = True
 # cfg.model.jaw_type = 'aa' # default use axis angle, another option: euler. Note that: aa is not stable in the beginning
 cfg.model.jaw_type = 'aa' # default use axis angle, another option: euler. Note that: aa is not stable in the beginning
 # face recognition model
-cfg.model.fr_model_path = './data/resnet50_ft_weight.pkl'
+cfg.model.fr_model_path = '/home/cine/Documents/HJCode/AU_sequence/data/resnet50_ft_weight.pkl'
 cfg.model.extract_tex = True
 
 ## details
@@ -90,9 +93,9 @@ cfg.model.max_z = 0.01
 cfg.dataset = CN()
 cfg.dataset.training_data = ['selfDataset']
 
-cfg.dataset.mediapipePath = './data/mediapipe_landmark_embedding.npz'
+cfg.dataset.mediapipePath = '/home/cine/Documents/HJCode/AU_sequence/data/mediapipe_landmark_embedding.npz'
 cfg.dataset.batch_size = 1
-cfg.dataset.K = 7
+cfg.dataset.K = 1
 cfg.dataset.isSingle = False
 # cfg.dataset.isSingle = True
 cfg.dataset.num_workers = 3
