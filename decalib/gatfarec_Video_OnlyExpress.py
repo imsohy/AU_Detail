@@ -46,6 +46,7 @@ class DECA(nn.Module):
         self.uv_size = self.cfg.model.uv_size
         self.flame_mask_file = self.cfg.model.flame_mask_path
         self.batchsize = self.cfg.dataset.batch_size
+        self.middleframe = self.cfg.dataset.K // 2
         self.au_weight = au_weights()
         self._create_model(self.cfg.model)
         self._setup_renderer(self.cfg.model)
@@ -267,7 +268,7 @@ class DECA(nn.Module):
         # feats = torch.concat([afn, global_feature], dim=1)
         for m in codedict:
             # print(m)
-            codedict[m] = codedict[m][1:2]
+            codedict[m] = codedict[m][self.middleframe:self.middleframe+1]
         # _, n, s = feats.shape
         # global_feature = F.linear(global_feature, self.weight, self.bias)
         parameters_ours = self.BiViT(afn, global_feature)
@@ -279,8 +280,8 @@ class DECA(nn.Module):
         codedict_our = self.decompose_code_part(parameters_ours, self.param_dict_OnlyE)
         # codedict = self.decompose_code(parameters_224, self.param_dict)
 
-        codedict['images'] = images_224[1:2]
-        codedict_our['images'] = images_224[1:2]
+        codedict['images'] = images_224[self.middleframe:self.middleframe+1]
+        codedict_our['images'] = images_224[self.middleframe:self.middleframe+1]
         codedict_our['shape'] = codedict['shape']
         codedict_our['tex'] = codedict['tex']
         codedict_our['cam'] = codedict['cam']

@@ -34,6 +34,7 @@ class Trainer(object):
         self.image_size = self.cfg.dataset.image_size
         self.uv_size = self.cfg.model.uv_size
         self.K = self.cfg.dataset.K
+        self.middleframe = self.cfg.dataset.K // 2
         # training stage: coarse and detail
         self.train_detail = self.cfg.train.train_detail
         self.vis_au = self.cfg.train.vis_au
@@ -139,10 +140,10 @@ class Trainer(object):
         #-- encoder
         codedict_old, codedict = self.mymodel.encode(images_224)
         # images = images_224
-        images = images_224[1:2]
-        lmk = lmk[1:2]
-        lmk_dense = lmk_dense[1:2]
-        masks = masks[1:2]
+        images = images_224[self.middleframe:self.middleframe+1]
+        lmk = lmk[self.middleframe:self.middleframe+1]
+        lmk_dense = lmk_dense[self.middleframe:self.middleframe+1]
+        masks = masks[self.middleframe:self.middleframe+1]
         batch_size = 1
         # batch_size = images_224.shape[0]
 

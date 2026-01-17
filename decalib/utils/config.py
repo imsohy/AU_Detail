@@ -95,7 +95,7 @@ cfg.dataset.training_data = ['selfDataset']
 
 cfg.dataset.mediapipePath = '/home/cine/Documents/HJCode/AU_sequence/data/mediapipe_landmark_embedding.npz'
 cfg.dataset.batch_size = 1
-cfg.dataset.K = 1
+cfg.dataset.K = 3       #****windowsize!!!!
 cfg.dataset.isSingle = False
 # cfg.dataset.isSingle = True
 cfg.dataset.num_workers = 3

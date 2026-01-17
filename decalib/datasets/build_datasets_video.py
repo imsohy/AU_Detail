@@ -41,7 +41,7 @@ class SelfDataset(Dataset):
             os.path.join(self.source2, "*/*/"))
 
         random.shuffle(self.masksList)
-        self.windowsize = 3
+        self.windowsize = K
 
     # def shuffle(self):
     #     random.shuffle(self.audioList)
