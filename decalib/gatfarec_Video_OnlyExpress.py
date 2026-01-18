@@ -85,6 +85,10 @@ class DECA(nn.Module):
         # self.n_param_part =  model_cfg.n_tex + model_cfg.n_exp + model_cfg.n_light
         self.n_param_part =  model_cfg.n_exp
         self.n_movem = model_cfg.n_exp + 3 # + 27  # exp + jaw pose + action unit
+        # Detail 모듈 파라미터 설정
+        # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:112-113
+        self.n_detail = model_cfg.n_detail  # detailcode parameter size
+        self.n_cond = model_cfg.n_exp + 3  # exp + jaw pose (3차원)
         self.param_dict = {i: model_cfg.get('n_' + i) for i in model_cfg.param_list}
         self.param_dict_OnlyE = {i: model_cfg.get('n_' + i) for i in model_cfg.param_list_OnlyE}
         # self.param_dict['tex'] = 50
@@ -137,36 +141,75 @@ class DECA(nn.Module):
         # # self.FTD = FLAMETransformerDecoderHead().to(self.device)
 
         self.AUNet = load_state_dict(self.AUNet, self.auconf.resume).to(self.device)
-        # decoders
-        # self.flame = FLAME(model_cfg).to(self.device)
-        # if model_cfg.use_tex:
-        #     self.flametex = FLAMETex(model_cfg).to(self.device)
-        # self.D_detail = Generator(latent_dim=self.n_detail + self.n_movem, out_channels=1, out_scale=model_cfg.max_z,
-        #                           sample_mode='bilinear').to(self.device)
+        
+        # Detail model setup
+        # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:136-153
+        # Strategy 1: AU_Detail의 Detail 모듈을 그대로 가져오기 (별도 초기화)
+        self.E_detail = ResnetEncoder(outsize=self.n_detail).to(self.device)
+        self.D_detail = Generator(
+            latent_dim=self.n_detail + self.n_cond,
+            out_channels=1,
+            out_scale=model_cfg.max_z,
+            sample_mode='bilinear'
+        ).to(self.device)
+        # Original DECA detail decoder (frozen, for DECA old results)
+        self.D_detail_original = Generator(
+            latent_dim=self.n_detail + self.n_cond,
+            out_channels=1,
+            out_scale=model_cfg.max_z,
+            sample_mode='bilinear'
+        ).to(self.device)
+        self.ViTDetail = ViTDetailEncoderSeque(
+            num_features=self.n_detail,
+            frames=self.cfg.dataset.K
+        ).to(self.device)
+        
         # resume model
+        # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:187-223
         model_path = self.cfg.pretrained_modelpath
         model_path_224 = self.cfg.pretrained_modelpath_224
-        if os.path.exists(model_path):
+        
+        # 1. Always load D_detail_original from the original DECA weights (model_path_224)
+        if os.path.exists(model_path_224):
+            print(f'Loading original DECA detail decoder from {model_path_224}')
+            orig_checkpoint = torch.load(model_path_224)
+            if 'D_detail' in orig_checkpoint:
+                util.copy_state_dict(self.D_detail_original.state_dict(), orig_checkpoint['D_detail'])
+                print('  D_detail_original loaded successfully.')
+        else:
+            print(f'Warning: Original DECA model not found at {model_path_224}. D_detail_original will not be initialized correctly.')
+        
+        # 2. Load other modules from either trained model (model_path) or fallback (model_path_224)
+        if os.path.exists(model_path):  # if trained model exists (e.g. during Demo)
             print(f'trained model found. load {model_path}')
             checkpoint = torch.load(model_path)
             self.checkpoint = checkpoint
-            # print(checkpoint.keys())
-            # util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
-            util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
-            # parameters = self.E_flame.state_dict()
-            # for name in self.E_flame.state_dict():
-            #     print(name)
-            # self.weight = parameters['layers.0.weight']
-            # self.bias = parameters['layers.0.bias']
+            # Load Coarse transformer if available
+            if 'BiViT' in checkpoint:
+                util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
+            
+            # Load Detail modules if available
+            if 'E_detail' in checkpoint:
+                util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
+            if 'D_detail' in checkpoint:
+                util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
+            # DO NOT load D_detail_original from here, it should remain original
+            if 'ViTDetail' in checkpoint:
+                util.copy_state_dict(self.ViTDetail.state_dict(), checkpoint['ViTDetail'])
+            
+            
         elif os.path.exists(model_path_224):
             print(f'trained model found. load {model_path_224}')
             checkpoint = torch.load(model_path_224)
-            # util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
-            # parameters = self.E_flame.state_dict()
-            # for name in self.E_flame.state_dict():
-            #     print(name)
-            # self.weight = parameters['layers.0.weight']
-            # self.bias = parameters['layers.0.bias']
+            self.checkpoint = checkpoint
+            # Load Detail modules from original DECA model
+            if 'E_detail' in checkpoint:
+                util.copy_state_dict(self.E_detail.state_dict(), checkpoint['E_detail'])
+            if 'D_detail' in checkpoint:
+                util.copy_state_dict(self.D_detail.state_dict(), checkpoint['D_detail'])
+            # D_detail_original already loaded above
+            if 'BiViT' in checkpoint:
+                util.copy_state_dict(self.BiViT.state_dict(), checkpoint['BiViT'])
             # print(parameters['layers.0.weight'].shape)
             # print(parameters['layers.0.bias'].shape)
             # print(parameters['layers.2.weight'].shape)
@@ -174,11 +217,18 @@ class DECA(nn.Module):
         else:
             print(f'please check pretrained deca model path: {model_path_224}')
             exit()
-        # eval mode
-
-        # self.E_flame.eval()
-        # self.E_flame.eval()
+        
+        # Set eval mode for all modules
+        # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:229-236
+        # EMOCA Coarse 모듈은 이미 라인 108에서 eval 모드로 설정됨 (self.emoca.eval())
+        # Detail modules
+        self.E_detail.eval()
+        self.D_detail.eval()
+        self.D_detail_original.eval()  # Always eval mode, frozen
+        self.ViTDetail.eval()
+        # Coarse transformer
         self.BiViT.eval()
+        # AUNet
         self.AUNet.eval()
 
     def decompose_code(self, code, num_dict):
@@ -266,20 +316,41 @@ class DECA(nn.Module):
             codedict, global_feature = self.emoca.encode(images_224, training=False)
             # parameters_224, global_feature = self.E_flame(images_224)
             _, afn = self.AUNet(images_224, use_gnn=False)
-        # feats = torch.concat([afn, global_feature], dim=1)
-        for m in codedict:
-            # print(m)
-            codedict[m] = codedict[m][self.middleframe:self.middleframe+1]
-        # _, n, s = feats.shape
-        # global_feature = F.linear(global_feature, self.weight, self.bias)
+            # Detail encoder: 전체 시퀀스에 대해 detailcode와 detail_feature 추출
+            # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:307
+            detailcode_old, detail_feature = self.E_detail(images_224)
+        
+        # shape_seq 추출: middleframe 자르기 전에 추출해야 함
+        # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:328
+        # EMOCA의 codedict에서 shapecode를 가져옴 (전체 시퀀스)
+        shape_seq = codedict['shape']  # (T, n_shape)
+        
+        # Detail transformer: ViTDetail 처리
+        # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:330-334
+        detailcode_ours = self.ViTDetail(
+            afn,
+            shape_seq,  # FLAME shape parameter 시퀀스
+            detail_feature
+        )
+        if detailcode_ours.shape[0] > 1:
+            detailcode_ours = torch.unsqueeze(detailcode_ours, 0)
+        
+        # Coarse transformer: BiViT 처리
         parameters_ours = self.BiViT(afn, global_feature)
-        # parameters_ours = self.ViT_LC(feats)
         if parameters_ours.shape[0] > 1:
-            parameters_ours = torch.unsqueeze(parameters_ours,0)
-        # parameters_224 = parameters_224[1:2]
+            parameters_ours = torch.unsqueeze(parameters_ours, 0)
+        
+        # middleframe만 남기기
+        for m in codedict:
+            codedict[m] = codedict[m][self.middleframe:self.middleframe+1]
+        detailcode_old = detailcode_old[self.middleframe:self.middleframe+1]
 
         codedict_our = self.decompose_code_part(parameters_ours, self.param_dict_OnlyE)
-        # codedict = self.decompose_code(parameters_224, self.param_dict)
+        
+        # Detail code 추가
+        # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:348-349
+        codedict['detail'] = detailcode_old
+        codedict_our['detail'] = detailcode_ours
 
         codedict['images'] = images_224[self.middleframe:self.middleframe+1]
         codedict_our['images'] = images_224[self.middleframe:self.middleframe+1]
@@ -289,7 +360,6 @@ class DECA(nn.Module):
         codedict_our['light'] = codedict['light']
         codedict_our['pose'] = deepcopy(codedict['pose'])
         # codedict_our['pose'][:,3:]=codedict_our['jaw_pose']
-
 
         return codedict, codedict_our
     
