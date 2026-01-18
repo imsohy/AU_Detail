@@ -28,6 +28,7 @@ from .models.OpenGraphAU.utils import *
 from .models.OpenGraphAU.conf import get_config,set_logger,set_outdir,set_env
 from .models.vitVideo import ViTEncoderV
 from .models.vitVideo_Sequence_Cross import ViTEncoderSeque
+from .models.ViTVideoSequence_DetailNew_20260104 import ViTDetailEncoderSeque
 # from .models.gat import GAT
 from .load import load_model
 
@@ -35,7 +36,7 @@ torch.backends.cudnn.benchmark = True
 from copy import deepcopy
 # PerspectiveCameras.transform_points_screen()
 class DECA(nn.Module):
-    def __init__(self, config=None, device='cuda:1'):
+    def __init__(self, config=None, device='cuda:0'):
         super(DECA, self).__init__()
         if config is None:
             self.cfg = cfg

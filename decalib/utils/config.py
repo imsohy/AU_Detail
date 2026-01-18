@@ -111,6 +111,8 @@ cfg.dataset.lmksize = 68
 # ---------------------------------------------------------------------------- #
 cfg.train = CN()
 cfg.train.train_detail = False
+cfg.train.train_coarse = True
+cfg.train.train_decoder = True
 cfg.train.max_epochs = 500
 cfg.train.max_steps = 1000000
 cfg.train.lr = 1e-4
@@ -162,15 +164,15 @@ cfg.loss.reg_light = 0.#1.
 cfg.loss.reg_jaw_pose = 0.8 #1.
 cfg.loss.use_gender_prior = False
 
-# # loss for detail
-# cfg.loss.detail_consistency = True
-# cfg.loss.useConstraint = True
-# cfg.loss.mrf = 5e-2
-# cfg.loss.photo_D = 2.
-# cfg.loss.reg_sym = 0.005
-# cfg.loss.reg_z = 0.005
-# cfg.loss.reg_diff = 0.005
-# cfg.loss.au_D = 0.0
+# loss for detail
+cfg.loss.detail_consistency = True
+cfg.loss.useConstraint = True
+cfg.loss.mrf = 5e-2
+cfg.loss.photo_D = 2.
+cfg.loss.reg_sym = 0.005
+cfg.loss.reg_z = 0.005
+cfg.loss.reg_diff = 0.005
+cfg.loss.au_D = 0.0
 
 
 def get_cfg_defaults():
