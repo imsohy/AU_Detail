@@ -74,6 +74,11 @@ class DECA(nn.Module):
         # dense mesh template, for save detail mesh
         self.dense_template = np.load(model_cfg.dense_template_path, allow_pickle=True, encoding='latin1').item()
 
+        # Render 객체 별칭 생성 (AU_Detail 코드 호환성 유지)
+        # 참고: phase3.1_d_detail_논의사항_상세.md - Render 객체 사용 방식
+        # EMOCA의 render 객체를 별칭으로 사용하여 AU_Detail 코드와 호환성 유지
+        self.render = self.emoca.deca.render
+
         # self.lightprobe_normal_images = F.interpolate(torch.from_numpy(np.load(model_cfg.lightprobe_normal_path)).float(), [model_cfg.image_size, model_cfg.image_size]).to(self.device)
         # self.lightprobe_albedo_images = F.interpolate(torch.from_numpy(np.load(model_cfg.lightprobe_albedo_path)).float(), [model_cfg.image_size, model_cfg.image_size]).to(self.device)
         
@@ -455,11 +460,79 @@ class DECA(nn.Module):
             ops_old = self.emoca.deca.render(verts_old, trans_verts_old, albedo_old, codedict_old['light'], h=h, w=w)#, background=background)
 
             opdict['rendered_images_emoca'] = ops_old['images']
-
+            opdict['grid_old'] = ops_old['grid']
+            opdict['rendered_images_old'] = ops_old['images']
+            opdict['alpha_images_old'] = ops_old['alpha_images']
+            opdict['normal_images_old'] = ops_old['normal_images']
+            opdict['v_colors_old'] = ops_old['v_colors']
 
             # predicted_images_alpha = ops['images'] * ops['alpha_images']
             # predicted_albedo_images = ops['albedo_images'] * ops['alpha_images']
             # predicted_shading = self.lightprobe_shading(self.SH_convert(lightcode))
+
+            if self.cfg.model.use_tex:
+                opdict['albedo'] = albedo
+                opdict['albedo_old'] = albedo_old
+
+            # Detail 렌더링 파이프라인 추가
+            # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:448-512
+            # Strategy 1: AU_Detail의 Detail 렌더링 파이프라인 그대로 가져오기
+            # AU_Detail_legacy와 동일하게 use_detail 플래그 없이 항상 실행됨 (라인 448-512)
+            # 참고: Trainer에서는 use_detail=False로 호출하지만, Detail 렌더링은 trainer에서 직접 수행함
+            
+            # Original DECA detail render (원본 DECA 비교용)
+            # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:457-480
+            cond_old = torch.cat([
+                codedict_old['pose'][:, 3:],  # jaw(3)
+                codedict_old['exp'],           # exp
+                codedict_old['detail'],        # detail
+            ], dim=1)
+            uv_z_old = self.D_detail_original(cond_old)
+
+            if iddict is not None:
+                cond_old_id = torch.cat([
+                    iddict['pose'][:, 3:],     # jaw(3)
+                    iddict['exp'],             # exp
+                    codedict_old['detail'],     # detail
+                ], dim=1)
+                uv_z_old = self.D_detail_original(cond_old_id)
+
+            uv_detail_normals_old = self.displacement2normal(uv_z_old, verts_old, ops_old['normals'])
+            uv_shading_old = self.render.add_SHlight(uv_detail_normals_old, codedict_old['light'])
+            uv_texture_old = albedo_old * uv_shading_old
+
+            opdict['uv_texture_old'] = uv_texture_old
+            opdict['normals_old'] = ops_old['normals']
+            opdict['uv_detail_normals_old'] = uv_detail_normals_old
+            opdict['displacement_map_old'] = uv_z_old + self.fixed_uv_dis[None, None, :, :]
+            # end DECA original detail render
+
+            # Our detail render (우리 모델)
+            # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:488-512
+            cond = torch.cat([
+                codedict['pose'][:, 3:],   # jaw(3)
+                codedict['exp'],           # exp
+                codedict['detail'],        # detail
+            ], dim=1)
+            uv_z = self.D_detail(cond)
+
+            if iddict is not None:
+                cond_id = torch.cat([
+                    iddict['pose'][:, 3:], # jaw(3)
+                    iddict['exp'],         # exp
+                    codedict['detail'],    # detail
+                ], dim=1)
+                uv_z = self.D_detail(cond_id)
+
+            uv_detail_normals = self.displacement2normal(uv_z, verts, ops['normals'])
+            uv_shading = self.render.add_SHlight(uv_detail_normals, codedict['light'])
+            uv_texture = albedo * uv_shading
+
+            opdict['uv_texture'] = uv_texture
+            opdict['normals'] = ops['normals']
+            opdict['uv_detail_normals'] = uv_detail_normals
+            opdict['displacement_map'] = uv_z + self.fixed_uv_dis[None, None, :, :]
+            # end OUR detail render
 
         if self.cfg.model.use_tex:
             opdict['albedo'] = albedo        
