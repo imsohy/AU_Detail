@@ -315,7 +315,10 @@ class DECA(nn.Module):
 
     from torch.nn import functional as F
     # @torch.no_grad()
-    def encode(self, images_224):
+    def encode(self, images_224, use_coarse_grad=True):
+        # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:293-344
+        # Strategy 1: AU_Detail의 encode 메서드 구조 사용
+        # Performance optimization: skip gradient computation for BiViT when train_coarse=False
 
         with torch.no_grad():
             codedict, global_feature = self.emoca.encode(images_224, training=False)
@@ -341,7 +344,13 @@ class DECA(nn.Module):
             detailcode_ours = torch.unsqueeze(detailcode_ours, 0)
         
         # Coarse transformer: BiViT 처리
-        parameters_ours = self.BiViT(afn, global_feature)
+        # 참고: AU_Detail_legacy/decalib/gatfarec_Video_DetailNew_20260104.py:313-317
+        # Performance optimization: skip gradient computation for BiViT when train_coarse=False
+        if use_coarse_grad:
+            parameters_ours = self.BiViT(afn, global_feature)
+        else:
+            with torch.no_grad():
+                parameters_ours = self.BiViT(afn, global_feature)
         if parameters_ours.shape[0] > 1:
             parameters_ours = torch.unsqueeze(parameters_ours, 0)
         
@@ -771,9 +780,10 @@ class DECA(nn.Module):
             # 'AU_Encoder': self.AU_Encoder.state_dict(),
             # 'GATE_detail': self.GATE_detail.state_dict(),
             # 'AUD_Encoder': self.AUD_Encoder.state_dict(),
-            # 'AU_Net': self.AUNet.state_dict(),
-            'emoca': self.emoca.state_dict(),
-            # 'E_detail': self.E_detail.state_dict(),
-            # 'D_detail': self.D_detail.state_dict()
-            'BiViT': self.BiViT.state_dict(),
+            'AUNet': self.AUNet.state_dict(),      #freeze
+            'emoca': self.emoca.state_dict(),      # EMOCA 모델 (E_flame 포함)
+            'E_detail': self.E_detail.state_dict(), #freeze
+            'D_detail': self.D_detail.state_dict(),  #freeze (train_decoder 플래그로 제어)
+            'BiViT': self.BiViT.state_dict(),       #trainable
+            'ViTDetail': self.ViTDetail.state_dict()    #trainable
         }

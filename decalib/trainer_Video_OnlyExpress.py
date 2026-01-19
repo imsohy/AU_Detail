@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from .utils import util
 from .utils.config import cfg
-from .utils import lossfuncN as lossfunc
+from .utils import lossfuncN_DetailNew as lossfunc  # Detail Loss 함수 사용
 from .utils.util import au_weights
 from .models.expression_loss import ExpressionLossNet
 from .models.OpenGraphAU.model.MEFL import MEFARG
@@ -37,7 +37,9 @@ class Trainer(object):
         self.middleframe = self.cfg.dataset.K // 2
         # training stage: coarse and detail
         self.train_detail = self.cfg.train.train_detail
-        self.vis_au = self.cfg.train.vis_au
+        self.train_coarse = self.cfg.train.train_coarse  # Added train_coarse flag
+        self.train_decoder = self.cfg.train.train_decoder  # Decoder(D_detail) 학습 여부
+        self.vis_au = self.cfg.train.vis_au     #check line 471 ~486: 결과 코드에서 AU 모드로 출력할지.
 
         # mymodel model
         self.mymodel = model.to(self.device)
@@ -50,9 +52,10 @@ class Trainer(object):
             # self.au_weight = au_weights()
 
         # initialize loss
-        # if self.train_detail:     
-        #     self.mrf_loss = lossfunc.IDMRFLoss()
-        #     self.face_attr_mask = util.load_local_mask(image_size=self.cfg.model.uv_size, mode='bbx')
+        # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:54-59
+        if self.train_detail:
+             self.mrf_loss = lossfunc.IDMRFLoss()
+             self.face_attr_mask = util.load_local_mask(image_size=self.cfg.model.uv_size, mode='bbx')
         # else:
         #     self.id_loss = lossfunc.VGGFace2Loss(pretrained_model=self.cfg.model.fr_model_path)      
         
@@ -62,13 +65,29 @@ class Trainer(object):
             self.writer = SummaryWriter(log_dir=os.path.join(self.cfg.output_dir, self.cfg.train.log_dir))
     
     def configure_optimizers(self):
-        self.opt = torch.optim.Adam(
-                                # list(self.mymodel.GATE.parameters()) + list(self.mymodel.AU_Encoder.parameters()),
-                                self.mymodel.BiViT.parameters(),
-                                # self.mymodel.ViT_LC.parameters(),
-                                # list(self.mymodel.FTD.parameters())  ,
-                                lr=self.cfg.train.lr,
-                                amsgrad=False)
+        # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:66-87
+        # Strategy 1: AU_Detail의 Optimizer 분리 방식 사용
+        if self.train_coarse:
+            self.opt_coarse = torch.optim.Adam(
+                self.mymodel.BiViT.parameters(),
+                lr=self.cfg.train.lr,
+                amsgrad=False
+            )
+        else:
+            self.opt_coarse = None
+        
+        if self.train_detail and hasattr(self.mymodel, 'ViTDetail'):
+            # ViTDetail은 항상 포함, D_detail은 train_decoder 플래그에 따라 결정
+            detail_params = list(self.mymodel.ViTDetail.parameters())
+            if self.train_decoder:
+                detail_params += list(self.mymodel.D_detail.parameters())
+            self.opt_detail = torch.optim.Adam(
+                detail_params,
+                lr=self.cfg.train.lr,
+                amsgrad=False
+            )
+        else:
+            self.opt_detail = None
         # self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, step_size=self.cfg.train.stepLR_steps, gamma=0.999)
     def load_checkpoint(self):
         # au config
@@ -87,45 +106,138 @@ class Trainer(object):
         self.AU_net = MEFARG(num_main_classes=self.auconf.num_main_classes, num_sub_classes=self.auconf.num_sub_classes, backbone=self.auconf.arc).to(self.device)
         self.AU_net = load_state_dict(self.AU_net, self.auconf.resume).to(self.device)
         self.AU_net.eval()
-        # resume training, including model weight, opt, steps
-        # import ipdb; ipdb.set_trace()
-        if self.cfg.train.resume and os.path.exists(os.path.join(self.cfg.output_dir, 'model.tar')):
-            # print('True')
-            checkpoint = torch.load(os.path.join(self.cfg.output_dir, 'model.tar')) 
+        
+        # ========== 가중치 로딩 순서 (중요!) ==========
+        # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:107-218
+        # Strategy 1: AU_Detail의 3단계 로딩 구조 사용
+        # 1. pretrained_modelpath: 초기 가중치 로딩
+        # 2. pretrained_coarse_modelpath: coarse 모듈 덮어쓰기
+        # 3. Resume: trainable 모듈만 덮어쓰기 (학습된 가중치)
+        
+        # ========== 1단계: pretrained_modelpath에서 모든 모듈 초기화 ==========
+        if os.path.exists(self.cfg.pretrained_modelpath):
+            logger.info(f'[Step 1/3] Loading pretrained model weights from {self.cfg.pretrained_modelpath}')
+            checkpoint = torch.load(self.cfg.pretrained_modelpath, map_location='cpu')
+            for key in model_dict.keys():
+                if key in checkpoint.keys():
+                    util.copy_state_dict(model_dict[key], checkpoint[key])
+                    logger.info(f'  Loaded {key} from pretrained_modelpath')
+            
+            # D_detail_original은 DECA.__init__에서 이미 원본 DECA 가중치로 초기화됨
+            # 여기서는 eval 모드만 확인
+            if hasattr(self.mymodel, 'D_detail_original'):
+                self.mymodel.D_detail_original.eval()
+                logger.info('  D_detail_original ensured to be in eval mode')
+        else:
+            logger.info('[Step 1/3] pretrained_modelpath not found, starting from scratch')
+        
+        # ========== 2단계: pretrained_coarse_modelpath에서 coarse 모듈 덮어쓰기 ==========
+        if os.path.exists(self.cfg.pretrained_coarse_modelpath):
+            logger.info(f'[Step 2/3] Loading coarse weights from pretrained_coarse_modelpath: {self.cfg.pretrained_coarse_modelpath}')
+            logger.info('  This may take a while if the checkpoint file is large...')
+            checkpoint_coarse = torch.load(self.cfg.pretrained_coarse_modelpath, map_location='cpu')
+            logger.info('  Checkpoint loaded successfully, copying weights...')
             model_dict = self.mymodel.model_dict()
-            for key in model_dict.keys():
-                if key in checkpoint.keys():
-                    util.copy_state_dict(model_dict[key], checkpoint[key])
-                else:
-                    continue
-                    # print("check model path", os.path.join(self.cfg.output_dir, 'model.tar'))
-                    # exit()
-            util.copy_state_dict(self.opt.state_dict(), checkpoint['opt'])
-            # self.opt.param_groups[0]['lr'] = 0.000005
-            self.global_step = checkpoint['global_step']
-            logger.info(f"resume training from {os.path.join(self.cfg.output_dir, 'model.tar')}")
-            logger.info(f"training start from step {self.global_step}")
+            
+            # Load EMOCA (E_flame 포함) and BiViT from coarse checkpoint
+            if 'emoca' in checkpoint_coarse.keys():
+                util.copy_state_dict(model_dict['emoca'], checkpoint_coarse['emoca'])
+                logger.info('  emoca (E_flame 포함) loaded successfully from pretrained_coarse_modelpath')
+            else:
+                logger.warning('  emoca not found in pretrained_coarse_modelpath checkpoint')
+            
+            if 'BiViT' in checkpoint_coarse.keys():
+                util.copy_state_dict(model_dict['BiViT'], checkpoint_coarse['BiViT'])
+                logger.info('  BiViT loaded successfully from pretrained_coarse_modelpath')
+            else:
+                logger.warning('  BiViT not found in pretrained_coarse_modelpath checkpoint')
+            
+            # Set train/freeze mode based on train_coarse flag
+            if self.train_coarse:
+                # EMOCA 내부의 E_flame은 항상 frozen
+                for param in self.mymodel.emoca.deca.E_flame.parameters():
+                    param.requires_grad = False
+                for param in self.mymodel.BiViT.parameters():
+                    param.requires_grad = True  # BiViT will be trained
+                logger.info('  Coarse weights loaded: BiViT will be fine-tuned (train_coarse=True)')
+            else:
+                for param in self.mymodel.emoca.deca.E_flame.parameters():
+                    param.requires_grad = False
+                for param in self.mymodel.BiViT.parameters():
+                    param.requires_grad = False
+                self.mymodel.emoca.deca.E_flame.eval()
+                self.mymodel.BiViT.eval()
+                logger.info('  Coarse weights loaded: E_flame and BiViT frozen (train_coarse=False)')
+            logger.info('[Step 2/3] pretrained_coarse_modelpath loading completed')
         else:
-            logger.info('model path not found, start training from scratch')
+            # Path not provided
+            if self.train_coarse:
+                logger.info('[Step 2/3] train_coarse=True but pretrained_coarse_modelpath not provided: coarse will train from scratch')
+                for param in self.mymodel.BiViT.parameters():
+                    param.requires_grad = True
+                logger.info('  BiViT set to trainable mode (requires_grad=True) for training from scratch')
+            else:
+                logger.error('=' * 80)
+                logger.error('ERROR: train_coarse=False but pretrained_coarse_modelpath is not provided!')
+                logger.error(f'pretrained_coarse_modelpath: {self.cfg.pretrained_coarse_modelpath}')
+                logger.error('When train_coarse=False, you MUST provide pretrained_coarse_modelpath to load coarse weights.')
+                logger.error('Please set pretrained_coarse_modelpath in your config file (yml).')
+                logger.error('=' * 80)
+                raise ValueError('train_coarse=False requires pretrained_coarse_modelpath to be set. Please check your config file.')
+        
+        # ========== 3단계: Resume - trainable 모듈만 덮어쓰기 (학습된 가중치) ==========
+        if self.cfg.train.resume and os.path.exists(os.path.join(self.cfg.output_dir, 'model.tar')):
+            logger.info(f'[Step 3/3] Resuming training from {os.path.join(self.cfg.output_dir, "model.tar")}')
+            checkpoint = torch.load(os.path.join(self.cfg.output_dir, 'model.tar'), map_location='cpu')
+            model_dict = self.mymodel.model_dict()
+            
+            # Trainable 모듈만 로딩 (pretrained 경로들을 덮어씀)
+            # BiViT (train_coarse=True일 때만)
+            if self.train_coarse and 'BiViT' in checkpoint.keys():
+                util.copy_state_dict(model_dict['BiViT'], checkpoint['BiViT'])
+                logger.info('  BiViT loaded from resume checkpoint (overwrites pretrained)')
+            
+            # ViTDetail (train_detail=True일 때만)
+            if self.train_detail and 'ViTDetail' in checkpoint.keys():
+                util.copy_state_dict(model_dict['ViTDetail'], checkpoint['ViTDetail'])
+                logger.info('  ViTDetail loaded from resume checkpoint (overwrites pretrained)')
+            
+            # D_detail (train_detail=True이고 train_decoder=True일 때만)
+            if self.train_detail and self.train_decoder and 'D_detail' in checkpoint.keys():
+                util.copy_state_dict(model_dict['D_detail'], checkpoint['D_detail'])
+                logger.info('  D_detail loaded from resume checkpoint (overwrites pretrained)')
+            elif self.train_detail and not self.train_decoder and 'D_detail' in checkpoint.keys():
+                logger.info('  D_detail found in checkpoint but train_decoder=False, skipping D_detail loading')
+            
+            # Optimizers 로딩
+            if self.opt_coarse is not None and 'opt_coarse' in checkpoint and checkpoint['opt_coarse'] is not None:
+                util.copy_state_dict(self.opt_coarse.state_dict(), checkpoint['opt_coarse'])
+                logger.info('  opt_coarse loaded from resume checkpoint')
+            elif self.opt_coarse is None and 'opt_coarse' in checkpoint:
+                logger.info('  opt_coarse found in checkpoint but train_coarse=False, skipping opt_coarse loading')
+            
+            if self.opt_detail is not None and 'opt_detail' in checkpoint and checkpoint['opt_detail'] is not None:
+                util.copy_state_dict(self.opt_detail.state_dict(), checkpoint['opt_detail'])
+                logger.info('  opt_detail loaded from resume checkpoint')
+            
+            # global_step 로딩
+            self.global_step = checkpoint.get('global_step', 0)
+            logger.info(f'[Step 3/3] Training will resume from step {self.global_step}')
+        else:
+            logger.info('[Step 3/3] Resume checkpoint not found, starting training from scratch')
             self.global_step = 0
-        # load model weights only
-        if os.path.exists(self.cfg.pretrained_modelpath):
-            checkpoint = torch.load(self.cfg.pretrained_modelpath)
-            for key in model_dict.keys():
-                if key in checkpoint.keys():
-                    util.copy_state_dict(model_dict[key], checkpoint[key])
-
-        if os.path.exists(self.cfg.pretrained_modelpath):
-            checkpoint = torch.load(self.cfg.pretrained_modelpath)
-            key = 'E_flame'
-            util.copy_state_dict(model_dict[key], checkpoint[key])
-            # self.global_step = 0
-        else:
-            logger.info('model path not found')
 
     def training_step(self, batch, batch_nb, training_type='coarse'):
+        # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:231-234
+        # Strategy 1: AU_Detail의 training_step 구조 사용
         self.mymodel.eval()
-        self.mymodel.BiViT.train()
+        if self.train_coarse:
+            self.mymodel.BiViT.train()
+        if self.train_detail:
+            if hasattr(self.mymodel, 'ViTDetail'):
+                self.mymodel.ViTDetail.train()
+            if self.train_decoder:
+                self.mymodel.D_detail.train()
 
         # [B, K, 3, size, size] ==> [BxK, 3, size, size]
         images_224 = batch['image_224'].to(self.device); images_224 = images_224.view(-1, images_224.shape[-3], images_224.shape[-2], images_224.shape[-1])
@@ -138,17 +250,25 @@ class Trainer(object):
         masks = batch['mask'].to(self.device); masks = masks.view(-1,images_224.shape[-3], images_224.shape[-2], images_224.shape[-1])
         # masks = batch['mask'].to(self.device); masks = masks.view(-1,images.shape[-3], images.shape[-2], images.shape[-1])
         #-- encoder
-        codedict_old, codedict = self.mymodel.encode(images_224)
+        # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:256
+        # Performance optimization: Pass use_coarse_grad to skip BiViT gradient computation when train_coarse=False
+        codedict_old, codedict = self.mymodel.encode(images_224, use_coarse_grad=self.train_coarse)
         # images = images_224
         images = images_224[self.middleframe:self.middleframe+1]
         lmk = lmk[self.middleframe:self.middleframe+1]
         lmk_dense = lmk_dense[self.middleframe:self.middleframe+1]
         masks = masks[self.middleframe:self.middleframe+1]
+        masks_original = masks.clone()
         batch_size = 1
         # batch_size = images_224.shape[0]
 
-        ###--------------- training coarse model
-        if not self.train_detail:
+        ###--------------- training coarse transformer + detail transformer
+        # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:268-270
+        # different loss function but same step.
+        losses = {}
+        
+        # Coarse loss 계산은 train_coarse=True일 때만 수행
+        if self.train_coarse:
             #-- decoder
             # rendering = True if self.cfg.loss.photo>0 else False
             rendering = True
@@ -266,7 +386,129 @@ class Trainer(object):
             for key in losses_key:
                 all_loss = all_loss + losses[key]
             losses['all_loss'] = all_loss
-            return losses, opdict
+            #----------coarse end
+        else:
+            # train_coarse=False일 때는 coarse loss 계산 생략
+            # Detail 학습에 필요한 최소한의 정보만 유지
+            losses['all_loss'] = 0.0
+            # opdict는 Detail 학습에 필요하므로 decode는 수행하되 loss 계산은 생략
+            rendering = True
+            opdict = self.mymodel.decode(
+                codedict, codedict_old, rendering = rendering,
+                vis_lmk=False, return_vis=False, use_detail=False)
+            opdict['images'] = images
+            opdict['lmk'] = lmk
+            opdict['lmk_dense'] = lmk_dense
+
+        ###------------------training detail model
+        # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:408-527
+        # Strategy 1: AU_Detail의 Detail Loss 계산 로직 그대로 가져오기
+        if self.train_detail:
+            shapecode = codedict['shape']
+            expcode = codedict['exp']
+            posecode = codedict['pose']
+            texcode = codedict['tex']
+            lightcode = codedict['light']
+            detailcode = codedict['detail']
+            cam = codedict['cam']
+
+            # FLAME 전방계산
+            # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:427-429
+            # EMOCA 구조 사용: self.mymodel.emoca.deca.flame
+            verts, landmarks2d, landmarks3d, _ = self.mymodel.emoca.deca.flame(
+                shape_params=shapecode,
+                expression_params=expcode,
+                pose_params=posecode
+            )
+            landmarks2d = util.batch_orth_proj(landmarks2d, codedict['cam'])[:,:,:2]
+            landmarks2d[:,:,1:] = -landmarks2d[:,:,1:]
+            # world to camera
+            trans_verts = util.batch_orth_proj(verts, cam)
+            predicted_landmarks = util.batch_orth_proj(landmarks2d, cam)[:,:,:2]
+            # camera to image space
+            trans_verts[:, :, 1:] = -trans_verts[:, :, 1:]
+            predicted_landmarks[:, :, 1:] = - predicted_landmarks[:, :, 1:]
+
+            # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:443-444
+            # EMOCA 구조 사용: self.mymodel.emoca.deca.flametex, self.mymodel.render
+            albedo = self.mymodel.emoca.deca.flametex(texcode)
+            ops = self.mymodel.render(verts, trans_verts, albedo, lightcode)
+            
+            masks_detail = masks_original[:,0:1,:,:]    #mask have same channel
+            
+            #make mymodel to make uv_z
+            ##################rendr detail at trainer side####################
+            # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:453-454
+            cond_d = torch.cat([posecode[:, 3:], expcode, detailcode], dim=1)
+            uv_z = self.mymodel.D_detail(cond_d)
+
+            # render detail: displacement -> normal -> shading -> uv_texture
+            # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:458-460
+            uv_detail_normals = self.mymodel.displacement2normal(uv_z, verts, ops['normals'])
+            uv_shading = self.mymodel.render.add_SHlight(uv_detail_normals, lightcode.detach())
+            uv_texture = albedo.detach() * uv_shading
+
+            # detail 이미지를 uv grid로 샘플링
+            # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:464-466
+            predicted_detail_images = F.grid_sample(
+                uv_texture, ops['grid'].detach(), align_corners=False
+            )
+            ####################render detail end####################
+
+            # extract texture
+            # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:470-484
+            uv_pverts = self.mymodel.render.world2uv(trans_verts).detach()
+            
+            uv_gt = F.grid_sample(torch.cat([images, masks_detail], dim=1),
+                                  uv_pverts.permute(0, 2, 3, 1)[..., :2],
+                                  mode='bilinear', align_corners=False)
+
+            uv_tex_gt = uv_gt[:, :3, :, :].detach()
+            uv_mask_gt = uv_gt[:, 3:, :, :].detach()
+
+            #self occlusion
+            # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:487-492
+            normals = util.vertex_normals(trans_verts, self.mymodel.render.faces.expand(batch_size, -1, -1))
+            uv_pnorm = self.mymodel.render.world2uv(normals)
+            uv_mask = (uv_pnorm[:, [-1], :, :] < -0.05).float().detach()
+            #mask combine
+            uv_vis_mask = uv_mask_gt * uv_mask * self.mymodel.uv_face_eye_mask
+
+            #### ------ losses
+            # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:494-519
+            pi = 0
+            new_size = 256
+            # face_attr_mask는 __init__에서 util.load_local_mask(..., mode='bbx')로 준비되어 있어야 합니다.
+            x0, x1, y0, y1 = self.face_attr_mask[pi]  # (left, right, top, bottom)
+            uv_texture_patch = F.interpolate(uv_texture[:, :, y0:y1, x0:x1], [new_size, new_size], mode='bilinear')
+            uv_texture_gt_patch = F.interpolate(uv_tex_gt[:, :, y0:y1, x0:x1], [new_size, new_size], mode='bilinear')
+            uv_vis_mask_patch = F.interpolate(uv_vis_mask[:, :, y0:y1, x0:x1], [new_size, new_size], mode='bilinear')
+
+            losses['photo_detail'] = (uv_texture_patch * uv_vis_mask_patch - uv_texture_gt_patch * uv_vis_mask_patch).abs().mean() * self.cfg.loss.photo_D
+            losses['photo_detail_mrf'] = self.mrf_loss(uv_texture_patch * uv_vis_mask_patch,
+                                                       uv_texture_gt_patch * uv_vis_mask_patch) * self.cfg.loss.photo_D * self.cfg.loss.mrf
+
+            losses['z_reg'] = torch.mean(uv_z.abs())*self.cfg.loss.reg_z
+            losses['z_diff'] = lossfunc.shading_smooth_loss(uv_shading)*self.cfg.loss.reg_diff
+            if self.cfg.loss.reg_sym > 0.:
+                nonvis_mask = (1 - util.binary_erosion(uv_vis_mask))
+                losses['z_sym'] = (nonvis_mask*(uv_z - torch.flip(uv_z, [-1]).detach()).abs()).sum()*self.cfg.loss.reg_sym
+
+            # detail 총합
+            losses['all_loss_detail'] = (
+                    losses['photo_detail']
+                    + losses.get('photo_detail_mrf', 0.0)
+                    + losses['z_reg'] + losses['z_diff']
+                    + (losses.get('z_sym', 0.0))
+            )
+
+            # 시각화용 결과도 opdict에 추가(원문과 이름 호환)
+            opdict['predicted_detail_images'] = predicted_detail_images
+            opdict['trans_verts'] = trans_verts
+            opdict['uv_texture'] = uv_texture
+            opdict['uv_detail_normals'] = uv_detail_normals
+
+        return losses, opdict
     
 
     # def evaluate(self):
@@ -476,8 +718,20 @@ class Trainer(object):
                     
                 if self.global_step>0 and self.global_step % self.cfg.train.checkpoint_steps == 0 or step == (iters_every_epoch-1):
                     model_dict = self.mymodel.model_dict()
-                    # model_dict = {key: model_dict[key]}
-                    model_dict['opt'] = self.opt.state_dict()
+                    # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:756-777
+                    # Strategy 1: AU_Detail의 모델 저장 방식 사용 (opt_coarse, opt_detail 분리 저장)
+                    
+                    # Save optimizers only if they exist
+                    if self.opt_coarse is not None:
+                        model_dict['opt_coarse'] = self.opt_coarse.state_dict()
+                    else:
+                        model_dict['opt_coarse'] = None  # Explicitly save None
+                    
+                    if self.opt_detail is not None:
+                        model_dict['opt_detail'] = self.opt_detail.state_dict()
+                    else:
+                        model_dict['opt_detail'] = None  # Explicitly save None
+
                     model_dict['global_step'] = self.global_step
                     model_dict['batch_size'] = self.batch_size
                     torch.save(model_dict, os.path.join(self.cfg.output_dir, 'model' + '.tar'))
@@ -493,8 +747,39 @@ class Trainer(object):
                 # if self.global_step % self.cfg.train.eval_steps == 0:
                 #     self.evaluate()
 
-                all_loss = losses['all_loss']
-                self.opt.zero_grad(); all_loss.backward(); self.opt.step(); # self.scheduler.step();
+                # 참고: AU_Detail_legacy/decalib/trainer_Video_DetailNew_20260103.py:785-816
+                # Strategy 1: AU_Detail의 Optimizer backward/step 방식 사용
+                # Zero gradients only for active optimizers
+                if self.opt_coarse is not None:
+                    self.opt_coarse.zero_grad(set_to_none=True)
+                if self.opt_detail is not None:
+                    self.opt_detail.zero_grad(set_to_none=True)
+
+                # coarse / detail 합계는 각각 losses['all_loss'], losses['all_loss_detail']로 계산되어 있음
+                loss_c = losses.get('all_loss', 0.0)
+                loss_d = losses.get('all_loss_detail', 0.0)
+
+                # Backward and step only for active optimizers
+                # Performance optimization: train_coarse=False일 때는 loss_c=0이므로 backward 생략
+                if loss_d != 0.0:
+                    if loss_c != 0.0:
+                        # Both coarse and detail losses
+                        torch.autograd.backward([loss_c, loss_d])
+                        if self.opt_coarse is not None:
+                            self.opt_coarse.step()
+                        if self.opt_detail is not None:
+                            self.opt_detail.step()
+                    else:
+                        # Only detail loss (train_coarse=False)
+                        loss_d.backward()
+                        if self.opt_detail is not None:
+                            self.opt_detail.step()
+                else:
+                    # Only coarse loss (train_detail=False)
+                    if loss_c != 0.0 and self.opt_coarse is not None:
+                        loss_c.backward()
+                        self.opt_coarse.step()
+
                 self.global_step += 1
                 if self.global_step > self.cfg.train.max_steps:
                     break
