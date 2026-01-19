@@ -1,0 +1,116 @@
+# ============================================================================
+# Detail 학습 설정 (Detail Training Configuration)
+# ============================================================================
+# 
+# 이 설정 파일은 이미 학습된 Coarse 모델을 사용하여 Detail만 학습합니다.
+#
+# 【학습 모드 설정】
+# train 섹션에서 다음 옵션을 설정합니다:
+#   - train_coarse: False   (Coarse 모델 freeze)
+#   - train_detail: True    (Detail 모델 학습)
+#   - train_decoder: False  (Decoder 학습 안 함, ViTDetail만 학습)
+#
+# 【가중치 로딩 방법】
+#
+# 1. pretrained_coarse_modelpath:
+#    - 반드시 설정 필요! (학습된 Coarse 모델 경로)
+#    - 이 경로의 E_flame과 BiViT를 로드하여 freeze합니다
+#
+# 2. pretrained_modelpath:
+#    - Detail 모델 초기화용 (선택사항)
+#    - 빈 문자열('')이면 Detail 모델은 처음부터 학습합니다
+#
+# 【Coarse Loss 설정】
+# - deca_pretrain_video_OnlyE2.yml과 동일한 Coarse loss 가중치 사용
+# - train_coarse=False이므로 실제로는 사용되지 않지만, 설정은 유지
+#
+# ============================================================================
+# '''
+# first step:
+# pre-train the coarse model (i.e.𝐸𝑐) for two epochs with a batch size of 64,
+# with 𝜆𝑙𝑚𝑘=1𝑒−4, 𝜆𝑒𝑦𝑒=1.0, 𝜆𝜷=1𝑒−4, and 𝜆𝝍=1𝑒−4
+#
+# Why:
+# training with only lmk loss for good initialization,
+# because the use of photometric loss needs good initialization both in regression and optimization
+# and also, photometric loss needs differentiable rendering that makes the training slow
+#
+#
+# '''
+#output_dir: "Training/pretrain3_1024_i"
+#output_dir: "Training/pretrain1_236"
+#output_dir: "Training1_videoC_OnlyE/pretrain1X1"
+output_dir: "/media/cine/de6afd1d-c444-4d43-a787-079519ace719/HJCode2/AUSequence/Training1_videoC_OnlyE_AULoss_7_3/detail_train"
+pretrained_modelpath: ''
+pretrained_coarse_modelpath: '/media/cine/de6afd1d-c444-4d43-a787-079519ace719/HJCode2/AUSequence/Training1_videoC_OnlyE_AULoss_7_3/pretrain1/model.tar'  # ⚠️ 필수! 학습된 Coarse 모델 경로
+#model_path_HJ: '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'
+dataset:
+  batch_size: 1
+  K: 3  # windowsize (Coarse 학습 시와 동일하게 설정, 또는 필요에 따라 조정)
+loss:
+  # Coarse Loss 설정 (deca_pretrain_video_OnlyE2.yml과 동일)
+  #  expression: 0.0
+  #  eyed: 0.3
+  #  id: 0.0
+  #  lipd: 0.05
+  #  lipread: 0.0
+  #  lmk: 2.0
+  #  lmk_mp: 2.0
+  #  photo: 0.0
+  #  reg_exp: 0.001
+  #  reg_jaw_pose: 0.0
+  #  reg_light: 0.0
+  #  reg_shape: 0.0001
+  #  reg_tex: 0.0
+  #  relaL: 0.2
+  expression: 0.08
+  eyed: 0.5
+  lipd: 0.0
+  lmk: 2.5
+  lmk_mp: 3.0
+  photo: 0.0
+  reg_exp: 1e-04 #or 1e-5
+  reg_jaw_pose: 0.0
+  #  reg_light: 0.0
+  reg_shape: 0.0
+  #  reg_tex: 0.
+  #  reg_light: 0.
+  reg_tex: 0.
+  reg_light: 0.
+  #  reg_tex: 0.0
+  relaL: 0.08
+  AUFLoss: 0.
+  mainAU: 0.05
+  subAU: 0.05
+  weightedAU: False
+  focalAU: True
+  
+  # Detail Loss 설정 (⚠️ 중요: Detail 학습에 필요한 Loss 설정)
+  detail_consistency: True
+  useConstraint: True
+  mrf: 5e-2
+  photo_D: 2.
+  reg_sym: 0.005
+  reg_z: 0.005
+  reg_diff: 0.005
+  au_D: 0.0
+train:
+  # 학습 모드 설정
+  train_coarse: False   # Coarse 모델(BiViT) freeze
+  train_detail: True    # Detail 모델(ViTDetail) 학습
+  train_decoder: False  # Decoder(D_detail) 학습 안 함 (ViTDetail만 학습)
+  
+  # Training 설정 (deca_pretrain_video_OnlyE2.yml과 동일)
+  resume: True
+  max_epochs: 25
+  max_steps: 1000000000000000000
+  log_steps: 1000
+  vis_steps: 1000
+  checkpoint_steps: 500
+  #  val_steps: 500
+  #  eval_steps: 1000
+  #  lr: 1e-4
+  lr: 1e-4
+model:
+  use_tex: True
+
