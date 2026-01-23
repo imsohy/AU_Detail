@@ -5,6 +5,8 @@
 /.cursor/
 /.mypy_cache/
 /AU_Sequence codecopy/
+
+#branch: feature/emoca-detail-integration/strategy1
 /GDL.egg-info/
 /Unusing codes/
 /assets/
