@@ -1,9 +1,19 @@
 /.idea/
 /decalib/models/OpenGraphAU/
 /data/
-__pycache__/
-*.pyc
 /sort/
 /.cursor/
 /.mypy_cache/
 /AU_Sequence codecopy/
+/GDL.egg-info/
+/Unusing codes/
+/assets/
+/external/
+/gdl_apps/
+
+data30_MEAD.txt
+data30_MEAD2.txt
+data30_MEADX.txt
+
+#불특정 지정해도 괜찮은 것
+__pycache__/
