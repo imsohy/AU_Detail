@@ -632,17 +632,17 @@ class DECA(nn.Module):
                 uv_gt = F.grid_sample(images, uv_pverts.permute(0, 2, 3, 1)[:, :, :, :2], mode='bilinear',
                                       align_corners=False)
                 
+                # Texture + coarse only (without detail)
+                render_images_coarse_only = images * (1 - opdict['v_colors']) + opdict['rendered_images'] * opdict['v_colors']
+                
                 # Sample detail texture to image space for render_images (use_detail=True일 때만)
                 if use_detail:
                     predicted_detail_images = F.grid_sample(opdict['uv_texture'], ops['grid'], align_corners=False)
                     opdict['predicted_detail_images'] = predicted_detail_images
-                
-                # Texture + coarse only (without detail)
-                render_images_coarse_only = images * (1 - opdict['v_colors']) + opdict['rendered_images'] * opdict['v_colors']
-                
-                # Texture + coarse + detail (use_detail=True일 때만)
-                if use_detail:
+                    # Texture + coarse + detail (use_detail=True일 때만)
                     render_images_with_detail = images * (1 - opdict['v_colors']) + opdict['predicted_detail_images'] * opdict['v_colors']
+                else:
+                    render_images_with_detail = None
                 
                 # Create blank space (same size as original image)
                 blank_image = torch.zeros_like(images)
@@ -679,19 +679,23 @@ class DECA(nn.Module):
                 visdict = {
                     'inputs': images,
                     'render_images_coarse_only': render_images_coarse_only,
-                    'render_images_with_detail': render_images_with_detail,
                     'blank_image': blank_image,
                     'shape_images': shape_images,
-                    'shape_detail_images': shape_detail_images,
                     'shape_images_old': shape_images_old,
-                    'shape_detail_images_old': shape_detail_images_old,
                     # Keep old keys for backward compatibility
                     'shape_images_full_old': shape_images_full_old,
                     'shape_images_full': shape_images_full,
-                    'shape_detail_images_full': shape_detail_images_full,
-                    'shape_detail_images_full_old': shape_detail_images_full_old,
-                    'render_images': render_images_with_detail,  # Keep for backward compatibility
+                    'render_images': render_images_coarse_only,  # Keep for backward compatibility
                 }
+                
+                # Add detail-related images only when use_detail=True
+                if use_detail:
+                    visdict['render_images_with_detail'] = render_images_with_detail
+                    visdict['shape_detail_images'] = shape_detail_images
+                    visdict['shape_detail_images_old'] = shape_detail_images_old
+                    visdict['shape_detail_images_full'] = shape_detail_images_full
+                    visdict['shape_detail_images_full_old'] = shape_detail_images_full_old
+                    visdict['render_images'] = render_images_with_detail  # Update render_images to use detail version
                 # if self.cfg.model.use_tex:
                 #     visdict['uv_texture_gt'] = uv_texture_gt #!!!
                 # visdict['rendered_images'] = ops['images']
