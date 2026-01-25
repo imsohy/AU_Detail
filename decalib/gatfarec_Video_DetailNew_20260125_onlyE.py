@@ -348,14 +348,8 @@ class DECA(nn.Module):
         # else: detailcode_old is already (1, n_detail) size, no need to slice
 
         #decompose
+        codedict_our = self.decompose_code_part(parameters_ours, self.param_dict_OnlyE) # decompose OUR exp only (OnlyExpressionA style)
         codedict = self.decompose_code(parameters_224, self.param_dict) # decompose DECA's 6 FLAME (coarse part)
-        
-        # Create OUR codedict by cloning DECA's one to ensure 100% compatibility (light, tex, etc.)
-        codedict_our = {key: val.clone() for key, val in codedict.items()}
-        
-        # Extract only exp from BiViT output and replace it
-        codedict_exp_only = self.decompose_code_part(parameters_ours, self.param_dict_OnlyE) # decompose OUR exp only (OnlyExpressionA style)
-        codedict_our['exp'] = codedict_exp_only['exp']  # Replace only the expression part with BiViT's output
         
         #add detailcode to codedicts
         codedict['detail'] = detailcode_old
@@ -364,6 +358,12 @@ class DECA(nn.Module):
         #우리의 파라미터 대신, 올드 파라미터를 덮어쓰겠다는 장면.
         codedict['images'] = images_224[self.middleframe:self.middleframe + 1]
         codedict_our['images'] = images_224[self.middleframe:self.middleframe + 1]
+
+        codedict_our['shape'] = codedict['shape'] #copy DECA shape to OUR shape
+        codedict_our['tex'] = codedict['tex']  #copy DECA tex to OUR tex (OnlyExpressA style)
+        codedict_our['cam'] = codedict['cam'] #copy DECA cam to OUR cam
+        codedict_our['light'] = codedict['light']  #copy DECA light to OUR light (OnlyExpressA style)
+        codedict_our['pose'] = deepcopy(codedict['pose']) #copy DECA pose to OUR pose
         # codedict_our['pose'][:,3:]=codedict_our['jaw_pose']
 
         return codedict, codedict_our       # = codedict_old, codedict
