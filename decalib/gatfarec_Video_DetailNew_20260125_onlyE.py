@@ -515,7 +515,7 @@ class DECA(nn.Module):
                 opdict['uv_texture'] = uv_texture
                 opdict['normals'] = ops['normals']
                 opdict['uv_detail_normals'] = uv_detail_normals
-            opdict['displacement_map'] = uv_z + self.fixed_uv_dis[None, None, :, :]
+                opdict['displacement_map'] = uv_z + self.fixed_uv_dis[None, None, :, :]
             # end OUR detail render
 
             if vis_lmk:
@@ -539,27 +539,25 @@ class DECA(nn.Module):
                                                                                             images=background,
                                                                                             return_grid=True)
 
-                # ORIGINAL DECA detail normal image
-                detail_normal_images_old = F.grid_sample(uv_detail_normals_old, grid_old, align_corners=False) * alpha_images_old
+                # ORIGINAL DECA detail normal image (use_detail=True일 때만)
+                if use_detail:
+                    detail_normal_images_old = F.grid_sample(opdict['uv_detail_normals_old'], grid_old, align_corners=False) * alpha_images_old
+                    # render ORIGINAL DECA detail images
+                    shape_detail_images_full_old, shape_detail_images_old = self.render.render_shape(verts_old, trans_verts_old,
+                                                                     detail_normal_images=detail_normal_images_old, h=h, w=w,
+                                                                     images=background)
+                    opdict['shape_detail_images_old'] = shape_detail_images_old
+                    opdict['shape_detail_images_full_old'] = shape_detail_images_full_old
 
-                # ADD OUR detail normal image
-                detail_normal_images = F.grid_sample(uv_detail_normals, grid, align_corners=False)*alpha_images
-                
-                # render ORIGINAL DECA detail images
-                shape_detail_images_full_old, shape_detail_images_old = self.render.render_shape(verts_old, trans_verts_old,
-                                                                 detail_normal_images=detail_normal_images_old, h=h, w=w,
-                                                                 images=background)
-
-                # render OUR detail images
-                shape_detail_images_full, shape_detail_images = self.render.render_shape(verts, trans_verts,
-                                                                 detail_normal_images=detail_normal_images, h=h, w=w,
-                                                                 images=background)
-                
-                # opdict에 shape_detail_images 추가
-                opdict['shape_detail_images'] = shape_detail_images
-                opdict['shape_detail_images_full'] = shape_detail_images_full
-                opdict['shape_detail_images_old'] = shape_detail_images_old
-                opdict['shape_detail_images_full_old'] = shape_detail_images_full_old
+                # ADD OUR detail normal image (use_detail=True일 때만)
+                if use_detail:
+                    detail_normal_images = F.grid_sample(opdict['uv_detail_normals'], grid, align_corners=False)*alpha_images
+                    # render OUR detail images
+                    shape_detail_images_full, shape_detail_images = self.render.render_shape(verts, trans_verts,
+                                                                     detail_normal_images=detail_normal_images, h=h, w=w,
+                                                                     images=background)
+                    opdict['shape_detail_images'] = shape_detail_images
+                    opdict['shape_detail_images_full'] = shape_detail_images_full
 
                 ## extract texture
                 ## TODO: current resolution 256x256, support higher resolution, and add visibility
@@ -567,14 +565,17 @@ class DECA(nn.Module):
                 uv_gt = F.grid_sample(images, uv_pverts.permute(0, 2, 3, 1)[:, :, :, :2], mode='bilinear',
                                       align_corners=False)
                 
-                # Sample detail texture to image space for render_images
-                predicted_detail_images = F.grid_sample(uv_texture, ops['grid'], align_corners=False)
+                # Sample detail texture to image space for render_images (use_detail=True일 때만)
+                if use_detail:
+                    predicted_detail_images = F.grid_sample(opdict['uv_texture'], ops['grid'], align_corners=False)
+                    opdict['predicted_detail_images'] = predicted_detail_images
                 
                 # Texture + coarse only (without detail)
                 render_images_coarse_only = images * (1 - opdict['v_colors']) + opdict['rendered_images'] * opdict['v_colors']
                 
-                # Texture + coarse + detail
-                render_images_with_detail = images * (1 - opdict['v_colors']) + predicted_detail_images * opdict['v_colors']
+                # Texture + coarse + detail (use_detail=True일 때만)
+                if use_detail:
+                    render_images_with_detail = images * (1 - opdict['v_colors']) + opdict['predicted_detail_images'] * opdict['v_colors']
                 
                 # Create blank space (same size as original image)
                 blank_image = torch.zeros_like(images)
