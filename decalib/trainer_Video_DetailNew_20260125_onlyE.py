@@ -29,7 +29,7 @@ from .datasets import build_datasets_video_WT_DetailNew as build_datasets
 torch.backends.cudnn.benchmark = True
 
 class Trainer(object):
-    def __init__(self, model, config=None, device='cuda:1'):
+    def __init__(self, model, config=None, device='cuda:0'):
         if config is None:
             self.cfg = cfg
         else:

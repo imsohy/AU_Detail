@@ -11,11 +11,9 @@ cfg = CN()
 abs_deca_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 cfg.deca_dir = abs_deca_dir
 #--------------------------------------
-#for multi gpu use (coarse detail split)
+#device setting (single GPU only)
 #--------------------------------------
-cfg.device = 'cuda:0'      # 기본은 한 대
-cfg.multi_gpu = False      # 기본은 싱글 GPU
-cfg.device_detail = 'cuda:1'  # 멀티일 때만 의미 있음
+cfg.device = 'cuda:0'      # Single GPU only
 
 # config_wt_DetailNew.py에서
 abs_deca_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
