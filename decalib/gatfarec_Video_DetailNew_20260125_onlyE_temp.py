@@ -350,6 +350,18 @@ class DECA(nn.Module):
         # DEBUG: parameters_224 슬라이싱 후 확인
         print(f"[DEBUG encode] parameters_224 shape after slicing: {parameters_224.shape}")
         print(f"[DEBUG encode] parameters_224 min/max/mean: {parameters_224.min().item():.6f}/{parameters_224.max().item():.6f}/{parameters_224.mean().item():.6f}")
+        
+        # DEBUG: param_dict 순서 확인
+        print(f"[DEBUG encode] param_dict keys order: {list(self.param_dict.keys())}")
+        print(f"[DEBUG encode] param_dict values: {[self.param_dict[k] for k in self.param_dict.keys()]}")
+        
+        # DEBUG: parameters_224에서 각 파라미터 위치 확인
+        start = 0
+        for key in self.param_dict:
+            end = start + int(self.param_dict[key])
+            param_slice = parameters_224[:, start:end]
+            print(f"[DEBUG encode] parameters_224[{start}:{end}] ({key}) shape: {param_slice.shape}, min/max/mean: {param_slice.min().item():.6f}/{param_slice.max().item():.6f}/{param_slice.mean().item():.6f}")
+            start = end
 
         #decompose
         codedict_our = self.decompose_code_part(parameters_ours, self.param_dict_OnlyE) # decompose OUR exp only (OnlyExpressionA style)
