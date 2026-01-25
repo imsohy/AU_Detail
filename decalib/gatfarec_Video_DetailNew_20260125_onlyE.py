@@ -50,7 +50,7 @@ from copy import deepcopy
 
 # PerspectiveCameras.transform_points_screen()
 class DECA(nn.Module):
-    def __init__(self, config=None, device='cuda:0', device_detail=None, multi_gpu=False):
+    def __init__(self, config=None, device='cuda:0'):
         super(DECA, self).__init__()
 
         #get config
@@ -59,10 +59,8 @@ class DECA(nn.Module):
         else:
             self.cfg = config
 
-        #device check & GPU setting get
+        #device setting
         self.device = device
-        self.multi_gpu = bool(multi_gpu)
-        self.device_detail = device_detail if (self.multi_gpu and device_detail is not None) else self.device
 
         self.image_size = self.cfg.dataset.image_size
         self.uv_size = self.cfg.model.uv_size
@@ -133,24 +131,24 @@ class DECA(nn.Module):
             self.flametex = FLAMETex(model_cfg).to(self.device) #flame texture decoder in DECA
 
         #detail model setup
-        self.E_detail = ResnetEncoder(outsize=self.n_detail).to(self.device_detail)
+        self.E_detail = ResnetEncoder(outsize=self.n_detail).to(self.device)
         self.D_detail = Generator(
             latent_dim=self.n_detail+self.n_cond,
             out_channels=1,
             out_scale=model_cfg.max_z,
             sample_mode = 'bilinear'
-        ).to(self.device_detail)
+        ).to(self.device)
         # Original DECA detail decoder (frozen, for DECA old results)
         self.D_detail_original = Generator(
             latent_dim=self.n_detail+self.n_cond,
             out_channels=1,
             out_scale=model_cfg.max_z,
             sample_mode = 'bilinear'
-        ).to(self.device_detail)
+        ).to(self.device)
         self.ViTDetail = ViTDetailEncoderSeque(
             num_features=self.n_detail,
             frames=self.cfg.dataset.K
-        ).to(self.device_detail)
+        ).to(self.device)
 
         # self.E_albedo = Resnet50Encoder_v2(outsize=model_cfg.n_tex).to(self.device)
         # self.E_scene_light = Resnet50Encoder(outsize=model_cfg.n_scenelight).to(self.device)
@@ -292,20 +290,18 @@ class DECA(nn.Module):
 
     # @torch.no_grad()
     def encode(self, images_224, use_coarse_grad=True):   #offer: encode(self, images_224, use_detail = True)
-        # DECA encodr
+        # DECA encoder
         #Image
         # -> E_flame (global_feature),
         # -> AUNet (afn; au feature),
         # -> E_detail (detail_feature)
-        # Performance optimization: GPU 하나만 사용하므로 device_detail로 이동 제거
-        images_c = images_224.to(self.device)
-        images_d = images_224  # 같은 device이므로 이동 불필요
+        images_224 = images_224.to(self.device)
         with torch.no_grad():
-            #coarse encoder/AUNet: self.device
-            parameters_224, global_feature = self.E_flame(images_c)   #extract parameter & global feature(2048dim)
-            _, afn = self.AUNet(images_c, use_gnn=False)              #get AU feature
-            #detail encoder: 같은 device에서 실행
-            detailcode_old, detail_feature = self.E_detail(images_d)   #get detail parameter & detail feature
+            #coarse encoder/AUNet
+            parameters_224, global_feature = self.E_flame(images_224)   #extract parameter & global feature(2048dim)
+            _, afn = self.AUNet(images_224, use_gnn=False)              #get AU feature
+            #detail encoder
+            detailcode_old, detail_feature = self.E_detail(images_224)   #get detail parameter & detail feature
 
         # coarse transformer
         #global_feature, afn
@@ -322,7 +318,6 @@ class DECA(nn.Module):
         #detail transformer
         #afn, shape, detail
         # -> ViTDetail (parameters_detail_ours)
-        # Performance optimization: GPU 하나만 사용하므로 device_detail로 이동 제거
 
         # patch 20250104
         # shape_seq 추출: parameters_224에서 앞 100차원만 슬라이싱 (middleframe 자르기 전!)
@@ -338,8 +333,8 @@ class DECA(nn.Module):
             detailcode_ours = torch.unsqueeze(detailcode_ours, 0)
 
         # only get middleframe's parameter
-        parameters_224 = parameters_224[self.middleframe:self.middleframe+1] #on device
-        detailcode_old = detailcode_old[self.middleframe:self.middleframe+1] #같은 device이므로 이동 불필요
+        parameters_224 = parameters_224[self.middleframe:self.middleframe+1]
+        detailcode_old = detailcode_old[self.middleframe:self.middleframe+1]
 
         #decompose
         codedict_our = self.decompose_code_part(parameters_ours, self.param_dict_OnlyE) # decompose OUR exp only (OnlyExpressionA style)
@@ -455,21 +450,20 @@ class DECA(nn.Module):
             #if iddict is not None:
             #    uv_z_old = self.D_detail(torch.cat([iddict['pose'][:, 3:], iddict['exp'], codedict_old['detail']], dim=1))
             
-            # Performance optimization: GPU 하나만 사용하므로 device_detail로 이동 제거
             cond_old = torch.cat([
                 codedict_old['pose'][:, 3:], #jaw(3)
                 codedict_old['exp'], #exp
                 codedict_old['detail'], #detail
-            ], dim=1)  # 같은 device이므로 이동 불필요
-            uv_z_old = self.D_detail_original(cond_old)  # 같은 device에서 실행
+            ], dim=1)
+            uv_z_old = self.D_detail_original(cond_old)
 
             if iddict is not None:
                 cond_old_id = torch.cat([
                     iddict['pose'][:, 3:], #jaw(3)
                     iddict['exp'], #exp
                     codedict_old['detail'], #detail
-                ], dim=1)  # 같은 device이므로 이동 불필요
-                uv_z_old = self.D_detail_original(cond_old_id)  # 같은 device에서 실행
+                ], dim=1)
+                uv_z_old = self.D_detail_original(cond_old_id)
 
             uv_detail_normals_old = self.displacement2normal(uv_z_old, verts_old, ops_old['normals'])
             uv_shading_old = self.render.add_SHlight(uv_detail_normals_old, codedict_old['light'])
@@ -486,20 +480,19 @@ class DECA(nn.Module):
             #uv_z = self.D_detail(torch.cat([codedict['pose'][:, 3:], codedict['exp'], codedict['detail']], dim=1))
             #if iddict is not None:
             #    uv_z = self.D_detail(torch.cat([iddict['pose'][:, 3:], iddict['exp'], codedict['detail']], dim=1))
-            # Performance optimization: GPU 하나만 사용하므로 device_detail로 이동 제거
             cond = torch.cat([
                 codedict['pose'][:, 3:], #jaw(3)
                 codedict['exp'], #exp
                 codedict['detail'], #detail
-            ], dim=1)  # 같은 device이므로 이동 불필요
-            uv_z = self.D_detail(cond)  # 같은 device에서 실행
+            ], dim=1)
+            uv_z = self.D_detail(cond)
             if iddict is not None:
                 cond_id = torch.cat([
                     iddict['pose'][:, 3:], #jaw(3)
                     iddict['exp'], #exp
                     codedict['detail'], #detail
-                ], dim=1)  # 같은 device이므로 이동 불필요
-                uv_z = self.D_detail(cond_id)  # 같은 device에서 실행
+                ], dim=1)
+                uv_z = self.D_detail(cond_id)
 
             # 우리 verts와 ops['normals'] 사용
             uv_detail_normals = self.displacement2normal(uv_z, verts, ops['normals'])

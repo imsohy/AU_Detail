@@ -42,30 +42,18 @@ def main(cfg):
 
     cfg.rasterizer_type = 'pytorch3d'
 
-    use_multi = getattr(cfg, "multi_gpu",False)    #check whether we use multi gpu
-    base_device = getattr(cfg, "device", "cuda:0")
-    device_detail = getattr(cfg, "device_detail", "cuda:1")
-
     # start training
     # deca model
-
-    if use_multi and device_detail is not None:
-        mymodel = DECA(
-            cfg,
-            device=base_device,
-            device_detail=getattr(cfg, "device_detail", base_device),
-            multi_gpu=True
-        )
-        print(f"Using multi GPU")
-    else:
-        mymodel = DECA(
-            cfg,
-            device=base_device,
-            device_detail=base_device,
-            multi_gpu=False
-        )
-        print(f"Using single GPU")
-    trainer = Trainer(model=mymodel, config=cfg, device=cfg.device)
+    # Multi-GPU 관련 로직 제거 (사용자 요청)
+    base_device = getattr(cfg, "device", "cuda:0")
+    
+    mymodel = DECA(
+        config=cfg,
+        device=base_device
+    )
+    print(f"Using device: {base_device}")
+    
+    trainer = Trainer(model=mymodel, config=cfg, device=base_device)
     ## start train
     trainer.fit()
 
