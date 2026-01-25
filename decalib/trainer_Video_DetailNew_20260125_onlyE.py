@@ -258,7 +258,8 @@ class Trainer(object):
         
         #-- encoder
         # Performance optimization: Pass use_coarse_grad to skip BiViT gradient computation when train_coarse=False
-        codedict_old, codedict = self.mymodel.encode(images_224, use_coarse_grad=self.train_coarse) #split image automaticalliy in encode
+        # Pass use_detail=False to skip detail model computation when train_detail=False
+        codedict_old, codedict = self.mymodel.encode(images_224, use_coarse_grad=self.train_coarse, use_detail=self.train_detail) #split image automaticalliy in encode
         # images = images_224
         images = images_224[self.middleframe:self.middleframe+1]
         lmk = lmk[self.middleframe:self.middleframe+1]
@@ -280,10 +281,11 @@ class Trainer(object):
             # rendering = True if self.cfg.loss.photo>0 else False
             rendering = True
             # codedict['tex'][:,:] = 2.0
-            # opdict_old = self.mymodel.decode(codedict_old, rendering = rendering, vis_lmk=False, return_vis=False, use_detail=False)
+            # opdict_old = self.mymodel.decode(codedict_old, rendering = rendering, vis_lmk=False, return_vis=False, use_detail=self.train_detail)
+            # use_detail=self.train_detail: detail loss 계산을 위해 train_detail 플래그 전달
             opdict = self.mymodel.decode(
                 codedict, codedict_old, rendering = rendering,
-                vis_lmk=False, return_vis=False, use_detail=False)
+                vis_lmk=False, return_vis=False, use_detail=self.train_detail)
             opdict['images'] = images
             opdict['lmk'] = lmk
             opdict['lmk_dense'] = lmk_dense
@@ -402,10 +404,11 @@ class Trainer(object):
             # Detail 학습에 필요한 최소한의 정보만 유지
             losses['all_loss'] = 0.0
             # opdict는 Detail 학습에 필요하므로 decode는 수행하되 loss 계산은 생략
+            # use_detail=self.train_detail: detail loss 계산을 위해 train_detail 플래그 전달
             rendering = True
             opdict = self.mymodel.decode(
                 codedict, codedict_old, rendering = rendering,
-                vis_lmk=False, return_vis=False, use_detail=False)
+                vis_lmk=False, return_vis=False, use_detail=self.train_detail)
             opdict['images'] = images
             opdict['lmk'] = lmk
             opdict['lmk_dense'] = lmk_dense

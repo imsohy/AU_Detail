@@ -289,19 +289,25 @@ class DECA(nn.Module):
         return vis68
 
     # @torch.no_grad()
-    def encode(self, images_224, use_coarse_grad=True):   #offer: encode(self, images_224, use_detail = True)
+    def encode(self, images_224, use_coarse_grad=True, use_detail=True):   #offer: encode(self, images_224, use_detail = True)
         # DECA encoder
         #Image
         # -> E_flame (global_feature),
         # -> AUNet (afn; au feature),
-        # -> E_detail (detail_feature)
+        # -> E_detail (detail_feature) - only when use_detail=True
         images_224 = images_224.to(self.device)
         with torch.no_grad():
             #coarse encoder/AUNet
             parameters_224, global_feature = self.E_flame(images_224)   #extract parameter & global feature(2048dim)
             _, afn = self.AUNet(images_224, use_gnn=False)              #get AU feature
-            #detail encoder
-            detailcode_old, detail_feature = self.E_detail(images_224)   #get detail parameter & detail feature
+            #detail encoder - only when use_detail=True
+            if use_detail:
+                detailcode_old, detail_feature = self.E_detail(images_224)   #get detail parameter & detail feature
+            else:
+                # Dummy values when detail is not needed
+                batch_size = images_224.shape[0]
+                detailcode_old = torch.zeros(batch_size, self.n_detail, device=self.device)
+                detail_feature = torch.zeros(batch_size, 512, device=self.device)  # E_detail output feature size
 
         # coarse transformer
         #global_feature, afn
@@ -315,26 +321,31 @@ class DECA(nn.Module):
         if parameters_ours.shape[0] > 1:
             parameters_ours = torch.unsqueeze(parameters_ours, 0)
 
-        #detail transformer
+        #detail transformer - only when use_detail=True
         #afn, shape, detail
         # -> ViTDetail (parameters_detail_ours)
+        if use_detail:
+            # patch 20250104
+            # shape_seq 추출: parameters_224에서 앞 100차원만 슬라이싱 (middleframe 자르기 전!)
+            shape_seq = parameters_224[:, :self.cfg.model.n_shape]  # (T, 100)
 
-        # patch 20250104
-        # shape_seq 추출: parameters_224에서 앞 100차원만 슬라이싱 (middleframe 자르기 전!)
-        shape_seq = parameters_224[:, :self.cfg.model.n_shape]  # (T, 100)
+            detailcode_ours = self.ViTDetail(
+                afn,  
+                shape_seq, # FLAME shape parameter 100바로 삽입
+                detail_feature
+            )
 
-        detailcode_ours = self.ViTDetail(
-            afn,  
-            shape_seq, # FLAME shape parameter 100바로 삽입
-            detail_feature
-        )
-
-        if detailcode_ours.shape[0] > 1:
-            detailcode_ours = torch.unsqueeze(detailcode_ours, 0)
+            if detailcode_ours.shape[0] > 1:
+                detailcode_ours = torch.unsqueeze(detailcode_ours, 0)
+        else:
+            # Dummy value when detail is not needed
+            detailcode_ours = torch.zeros(1, self.n_detail, device=self.device)
 
         # only get middleframe's parameter
         parameters_224 = parameters_224[self.middleframe:self.middleframe+1]
-        detailcode_old = detailcode_old[self.middleframe:self.middleframe+1]
+        if use_detail:
+            detailcode_old = detailcode_old[self.middleframe:self.middleframe+1]
+        # else: detailcode_old is already (1, n_detail) size, no need to slice
 
         #decompose
         codedict_our = self.decompose_code_part(parameters_ours, self.param_dict_OnlyE) # decompose OUR exp only (OnlyExpressionA style)
@@ -443,66 +454,67 @@ class DECA(nn.Module):
 
 
             #ORiginal deca detail render.
-
-            #original code: if use_detail...
-            #DECA original detail render
-            #uv_z_old = self.D_detail(torch.cat([codedict_old['pose'][:, 3:], codedict_old['exp'], codedict_old['detail']], dim=1))
-            #if iddict is not None:
-            #    uv_z_old = self.D_detail(torch.cat([iddict['pose'][:, 3:], iddict['exp'], codedict_old['detail']], dim=1))
-            
-            cond_old = torch.cat([
-                codedict_old['pose'][:, 3:], #jaw(3)
-                codedict_old['exp'], #exp
-                codedict_old['detail'], #detail
-            ], dim=1)
-            uv_z_old = self.D_detail_original(cond_old)
-
-            if iddict is not None:
-                cond_old_id = torch.cat([
-                    iddict['pose'][:, 3:], #jaw(3)
-                    iddict['exp'], #exp
+            # Performance optimization: Only compute detail when use_detail=True
+            if use_detail:
+                #original code: if use_detail...
+                #DECA original detail render
+                #uv_z_old = self.D_detail(torch.cat([codedict_old['pose'][:, 3:], codedict_old['exp'], codedict_old['detail']], dim=1))
+                #if iddict is not None:
+                #    uv_z_old = self.D_detail(torch.cat([iddict['pose'][:, 3:], iddict['exp'], codedict_old['detail']], dim=1))
+                
+                cond_old = torch.cat([
+                    codedict_old['pose'][:, 3:], #jaw(3)
+                    codedict_old['exp'], #exp
                     codedict_old['detail'], #detail
                 ], dim=1)
-                uv_z_old = self.D_detail_original(cond_old_id)
+                uv_z_old = self.D_detail_original(cond_old)
 
-            uv_detail_normals_old = self.displacement2normal(uv_z_old, verts_old, ops_old['normals'])
-            uv_shading_old = self.render.add_SHlight(uv_detail_normals_old, codedict_old['light'])
-            uv_texture_old = albedo_old * uv_shading_old
+                if iddict is not None:
+                    cond_old_id = torch.cat([
+                        iddict['pose'][:, 3:], #jaw(3)
+                        iddict['exp'], #exp
+                        codedict_old['detail'], #detail
+                    ], dim=1)
+                    uv_z_old = self.D_detail_original(cond_old_id)
 
-            opdict['uv_texture_old'] = uv_texture_old
-            opdict['normals_old'] = ops_old['normals']
-            opdict['uv_detail_normals_old'] = uv_detail_normals_old
-            opdict['displacement_map_old'] = uv_z_old + self.fixed_uv_dis[None, None, :, :]
-            # end DECA original detail render
+                uv_detail_normals_old = self.displacement2normal(uv_z_old, verts_old, ops_old['normals'])
+                uv_shading_old = self.render.add_SHlight(uv_detail_normals_old, codedict_old['light'])
+                uv_texture_old = albedo_old * uv_shading_old
 
-            ## ADD OUR detail render here.
-            # 우리 detail code로 displacement map 생성
-            #uv_z = self.D_detail(torch.cat([codedict['pose'][:, 3:], codedict['exp'], codedict['detail']], dim=1))
-            #if iddict is not None:
-            #    uv_z = self.D_detail(torch.cat([iddict['pose'][:, 3:], iddict['exp'], codedict['detail']], dim=1))
-            cond = torch.cat([
-                codedict['pose'][:, 3:], #jaw(3)
-                codedict['exp'], #exp
-                codedict['detail'], #detail
-            ], dim=1)
-            uv_z = self.D_detail(cond)
-            if iddict is not None:
-                cond_id = torch.cat([
-                    iddict['pose'][:, 3:], #jaw(3)
-                    iddict['exp'], #exp
+                opdict['uv_texture_old'] = uv_texture_old
+                opdict['normals_old'] = ops_old['normals']
+                opdict['uv_detail_normals_old'] = uv_detail_normals_old
+                opdict['displacement_map_old'] = uv_z_old + self.fixed_uv_dis[None, None, :, :]
+                # end DECA original detail render
+
+                ## ADD OUR detail render here.
+                # 우리 detail code로 displacement map 생성
+                #uv_z = self.D_detail(torch.cat([codedict['pose'][:, 3:], codedict['exp'], codedict['detail']], dim=1))
+                #if iddict is not None:
+                #    uv_z = self.D_detail(torch.cat([iddict['pose'][:, 3:], iddict['exp'], codedict['detail']], dim=1))
+                cond = torch.cat([
+                    codedict['pose'][:, 3:], #jaw(3)
+                    codedict['exp'], #exp
                     codedict['detail'], #detail
                 ], dim=1)
-                uv_z = self.D_detail(cond_id)
+                uv_z = self.D_detail(cond)
+                if iddict is not None:
+                    cond_id = torch.cat([
+                        iddict['pose'][:, 3:], #jaw(3)
+                        iddict['exp'], #exp
+                        codedict['detail'], #detail
+                    ], dim=1)
+                    uv_z = self.D_detail(cond_id)
 
-            # 우리 verts와 ops['normals'] 사용
-            uv_detail_normals = self.displacement2normal(uv_z, verts, ops['normals'])
-            uv_shading = self.render.add_SHlight(uv_detail_normals, codedict['light'])
-            uv_texture = albedo * uv_shading
+                # 우리 verts와 ops['normals'] 사용
+                uv_detail_normals = self.displacement2normal(uv_z, verts, ops['normals'])
+                uv_shading = self.render.add_SHlight(uv_detail_normals, codedict['light'])
+                uv_texture = albedo * uv_shading
 
-            # 우리 detail 결과를 opdict에 저장 (기본 키, loss 계산용)
-            opdict['uv_texture'] = uv_texture
-            opdict['normals'] = ops['normals']
-            opdict['uv_detail_normals'] = uv_detail_normals
+                # 우리 detail 결과를 opdict에 저장 (기본 키, loss 계산용)
+                opdict['uv_texture'] = uv_texture
+                opdict['normals'] = ops['normals']
+                opdict['uv_detail_normals'] = uv_detail_normals
             opdict['displacement_map'] = uv_z + self.fixed_uv_dis[None, None, :, :]
             # end OUR detail render
 
