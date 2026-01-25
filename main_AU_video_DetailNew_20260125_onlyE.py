@@ -59,7 +59,9 @@ def main(cfg):
 
 # increase weighted landmarks loss of mouth
 if __name__ == '__main__':
-    cfg = parse_args(cfg_name='configs/release_version/deca_pretrain_video_OnlyE2_DetailNewBranch_decodertrain_v3.yml')
+    # Config 파일 선택 (OnlyE 또는 OnlyE2)
+    # cfg = parse_args(cfg_name='configs/release_version/deca_pretrain_video_20260125_onlyE.yml')  # AU Loss 있음
+    cfg = parse_args(cfg_name='configs/release_version/deca_pretrain_video_20260125_onlyE2.yml')  # AU Loss 없음
     
     # Check if at least one training option is enabled
     if not cfg.train.train_coarse and not cfg.train.train_detail:

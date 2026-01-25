@@ -411,123 +411,128 @@ class Trainer(object):
             opdict['lmk_dense'] = lmk_dense
 
         ###------------------training detail model
-        shapecode = codedict['shape']
-        expcode = codedict['exp']
-        posecode = codedict['pose']#
-        texcode = codedict['tex']
-        lightcode = codedict['light']
-        detailcode = codedict['detail']
-        cam = codedict['cam']
+        # Detail loss 계산은 train_detail=True일 때만 수행
+        if self.train_detail:
+            shapecode = codedict['shape']
+            expcode = codedict['exp']
+            posecode = codedict['pose']#
+            texcode = codedict['tex']
+            lightcode = codedict['light']
+            detailcode = codedict['detail']
+            cam = codedict['cam']
 
-        #print(f"[DEBUG] codedict shapes:")
-        #print(f"  shapecode: {shapecode.shape}")
-        #print(f"  expcode: {expcode.shape}")
-        #print(f"  posecode: {posecode.shape}")
-        #print(f"  texcode: {texcode.shape}")
-        #print(f"  lightcode: {lightcode.shape}")
-        #print(f"  detailcode: {detailcode.shape}")
-        #print(f"  cam: {cam.shape}")
+            #print(f"[DEBUG] codedict shapes:")
+            #print(f"  shapecode: {shapecode.shape}")
+            #print(f"  expcode: {expcode.shape}")
+            #print(f"  posecode: {posecode.shape}")
+            #print(f"  texcode: {texcode.shape}")
+            #print(f"  lightcode: {lightcode.shape}")
+            #print(f"  detailcode: {detailcode.shape}")
+            #print(f"  cam: {cam.shape}")
 
-        # FLAME 전방계산 (원문 동일)
-        verts, landmarks2d, landmarks3d, _= self.mymodel.flame(shape_params=shapecode,
-                                                 expression_params=expcode,
-                                                 pose_params=posecode)
-        landmarks2d = util.batch_orth_proj(landmarks2d, codedict['cam'])[:,:,:2]; landmarks2d[:,:,1:] = -landmarks2d[:,:,1:] #; landmarks2d = landmarks2d*self.image_size/2 + self.image_size/2
-        # world to camera
-        trans_verts = util.batch_orth_proj(verts, cam)
-        
-        
-        predicted_landmarks = util.batch_orth_proj(landmarks2d, cam)[:,:,:2]
-        # camera to image space
-        trans_verts[:, :, 1:] = -trans_verts[:, :, 1:]
-        predicted_landmarks[:, :, 1:] = - predicted_landmarks[:, :, 1:]
-        # 디버깅: trans_verts shape
-        #print(f"[DEBUG] trans_verts shape: {trans_verts.shape}")
-
-
-        albedo = self.mymodel.flametex(texcode)
-        ops = self.mymodel.render(verts, trans_verts, albedo, lightcode)
-        
-        masks_detail = masks_original[:,0:1,:,:]    #mask have same channel
-        
-        #make mymodel to make uv_z
-        ##################rendr detail at trainer side####################
-        # 원본의 코드와 다르게 D_detail에 들어가는 것의 형태가 좀 다른 것 같습니다.
-        # Performance optimization: GPU 하나만 사용하므로 device 간 이동 제거
-
-        cond_d = torch.cat([posecode[:, 3:], expcode, detailcode], dim=1)
-        uv_z = self.mymodel.D_detail(cond_d)  # 같은 device에서 실행
-     
-
-        # render detail: displacement -> normal -> shading -> uv_texture (원문 동일)
-        uv_detail_normals = self.mymodel.displacement2normal(uv_z, verts, ops['normals'])
-        uv_shading = self.mymodel.render.add_SHlight(uv_detail_normals, lightcode.detach())
-        uv_texture = albedo.detach() * uv_shading
+            # FLAME 전방계산 (원문 동일)
+            verts, landmarks2d, landmarks3d, _= self.mymodel.flame(shape_params=shapecode,
+                                                     expression_params=expcode,
+                                                     pose_params=posecode)
+            landmarks2d = util.batch_orth_proj(landmarks2d, codedict['cam'])[:,:,:2]; landmarks2d[:,:,1:] = -landmarks2d[:,:,1:] #; landmarks2d = landmarks2d*self.image_size/2 + self.image_size/2
+            # world to camera
+            trans_verts = util.batch_orth_proj(verts, cam)
+            
+            
+            predicted_landmarks = util.batch_orth_proj(landmarks2d, cam)[:,:,:2]
+            # camera to image space
+            trans_verts[:, :, 1:] = -trans_verts[:, :, 1:]
+            predicted_landmarks[:, :, 1:] = - predicted_landmarks[:, :, 1:]
+            # 디버깅: trans_verts shape
+            #print(f"[DEBUG] trans_verts shape: {trans_verts.shape}")
 
 
-        # detail 이미지를 uv grid로 샘플링 (원문 동일)
-        predicted_detail_images = F.grid_sample(
-            uv_texture, ops['grid'].detach(), align_corners=False
-        )
-        ####################render detail end####################
+            albedo = self.mymodel.flametex(texcode)
+            ops = self.mymodel.render(verts, trans_verts, albedo, lightcode)
+            
+            masks_detail = masks_original[:,0:1,:,:]    #mask have same channel
+            
+            #make mymodel to make uv_z
+            ##################rendr detail at trainer side####################
+            # 원본의 코드와 다르게 D_detail에 들어가는 것의 형태가 좀 다른 것 같습니다.
+            # Performance optimization: GPU 하나만 사용하므로 device 간 이동 제거
 
-        # extract texture
-        uv_pverts = self.mymodel.render.world2uv(trans_verts).detach()
-                # 디버깅: uv_pverts shape 및 F.grid_sample 입력 shapes
-        #print(f"[DEBUG] uv_pverts shape: {uv_pverts.shape}")
-        #print(f"[DEBUG] uv_pverts.permute(0, 2, 3, 1) shape: {uv_pverts.permute(0, 2, 3, 1).shape}")
-        #print(f"[DEBUG] uv_pverts.permute(0, 2, 3, 1)[..., :2] shape: {uv_pverts.permute(0, 2, 3, 1)[..., :2].shape}")
-        #print(f"[DEBUG] torch.cat([images, masks_detail], dim=1) shape: {torch.cat([images, masks_detail], dim=1).shape}")
-        
-        
-        uv_gt = F.grid_sample(torch.cat([images, masks_detail], dim=1),
-                              uv_pverts.permute(0, 2, 3, 1)[..., :2],
-                              mode='bilinear', align_corners=False)
+            cond_d = torch.cat([posecode[:, 3:], expcode, detailcode], dim=1)
+            uv_z = self.mymodel.D_detail(cond_d)  # 같은 device에서 실행
+         
 
-        #print(f"[DEBUG] uv_gt shape: {uv_gt.shape}")
-        uv_tex_gt = uv_gt[:, :3, :, :].detach()
-        uv_mask_gt = uv_gt[:, 3:, :, :].detach()
+            # render detail: displacement -> normal -> shading -> uv_texture (원문 동일)
+            uv_detail_normals = self.mymodel.displacement2normal(uv_z, verts, ops['normals'])
+            uv_shading = self.mymodel.render.add_SHlight(uv_detail_normals, lightcode.detach())
+            uv_texture = albedo.detach() * uv_shading
 
-        #self occlusion
-        normals = util.vertex_normals(trans_verts, self.mymodel.render.faces.expand(batch_size, -1, -1))
-        uv_pnorm = self.mymodel.render.world2uv(normals)
-        uv_mask = (uv_pnorm[:, [-1], :, :] < -0.05).float().detach()
-        #mask combine
 
-        uv_vis_mask = uv_mask_gt * uv_mask * self.mymodel.uv_face_eye_mask
+            # detail 이미지를 uv grid로 샘플링 (원문 동일)
+            predicted_detail_images = F.grid_sample(
+                uv_texture, ops['grid'].detach(), align_corners=False
+            )
+            ####################render detail end####################
 
-        #### ------ losses
-        pi = 0
-        new_size = 256
-        # face_attr_mask는 __init__에서 util.load_local_mask(..., mode='bbx')로 준비되어 있어야 합니다.
-        x0, x1, y0, y1 = self.face_attr_mask[pi]  # (left, right, top, bottom)
-        uv_texture_patch = F.interpolate(uv_texture[:, :, y0:y1, x0:x1], [new_size, new_size], mode='bilinear')
-        uv_texture_gt_patch = F.interpolate(uv_tex_gt[:, :, y0:y1, x0:x1], [new_size, new_size], mode='bilinear')
-        uv_vis_mask_patch = F.interpolate(uv_vis_mask[:, :, y0:y1, x0:x1], [new_size, new_size], mode='bilinear')
+            # extract texture
+            uv_pverts = self.mymodel.render.world2uv(trans_verts).detach()
+                    # 디버깅: uv_pverts shape 및 F.grid_sample 입력 shapes
+            #print(f"[DEBUG] uv_pverts shape: {uv_pverts.shape}")
+            #print(f"[DEBUG] uv_pverts.permute(0, 2, 3, 1) shape: {uv_pverts.permute(0, 2, 3, 1).shape}")
+            #print(f"[DEBUG] uv_pverts.permute(0, 2, 3, 1)[..., :2] shape: {uv_pverts.permute(0, 2, 3, 1)[..., :2].shape}")
+            #print(f"[DEBUG] torch.cat([images, masks_detail], dim=1) shape: {torch.cat([images, masks_detail], dim=1).shape}")
+            
+            
+            uv_gt = F.grid_sample(torch.cat([images, masks_detail], dim=1),
+                                  uv_pverts.permute(0, 2, 3, 1)[..., :2],
+                                  mode='bilinear', align_corners=False)
 
-        losses['photo_detail'] = (uv_texture_patch * uv_vis_mask_patch - uv_texture_gt_patch * uv_vis_mask_patch).abs().mean() * self.cfg.loss.photo_D
-        losses['photo_detail_mrf'] = self.mrf_loss(uv_texture_patch * uv_vis_mask_patch,
-                                                   uv_texture_gt_patch * uv_vis_mask_patch) * self.cfg.loss.photo_D * self.cfg.loss.mrf
+            #print(f"[DEBUG] uv_gt shape: {uv_gt.shape}")
+            uv_tex_gt = uv_gt[:, :3, :, :].detach()
+            uv_mask_gt = uv_gt[:, 3:, :, :].detach()
 
-        losses['z_reg'] = torch.mean(uv_z.abs())*self.cfg.loss.reg_z
-        losses['z_diff'] = lossfunc.shading_smooth_loss(uv_shading)*self.cfg.loss.reg_diff
-        if self.cfg.loss.reg_sym > 0.:
-            nonvis_mask = (1 - util.binary_erosion(uv_vis_mask))
-            losses['z_sym'] = (nonvis_mask*(uv_z - torch.flip(uv_z, [-1]).detach()).abs()).sum()*self.cfg.loss.reg_sym
+            #self occlusion
+            normals = util.vertex_normals(trans_verts, self.mymodel.render.faces.expand(batch_size, -1, -1))
+            uv_pnorm = self.mymodel.render.world2uv(normals)
+            uv_mask = (uv_pnorm[:, [-1], :, :] < -0.05).float().detach()
+            #mask combine
 
-        # detail 총합
-        losses['all_loss_detail'] = (
-                losses['photo_detail']
-                + losses.get('photo_detail_mrf', 0.0)
-                + losses['z_reg'] + losses['z_diff']
-                + (losses.get('z_sym', 0.0))
-        )
+            uv_vis_mask = uv_mask_gt * uv_mask * self.mymodel.uv_face_eye_mask
 
-        # 시각화용 결과도 opdict에 추가(원문과 이름 호환)
-        opdict['predicted_detail_images'] = predicted_detail_images
-        opdict['trans_verts'] = trans_verts
-        opdict['uv_texture'] = uv_texture
-        opdict['uv_detail_normals'] = uv_detail_normals
+            #### ------ losses
+            pi = 0
+            new_size = 256
+            # face_attr_mask는 __init__에서 util.load_local_mask(..., mode='bbx')로 준비되어 있어야 합니다.
+            x0, x1, y0, y1 = self.face_attr_mask[pi]  # (left, right, top, bottom)
+            uv_texture_patch = F.interpolate(uv_texture[:, :, y0:y1, x0:x1], [new_size, new_size], mode='bilinear')
+            uv_texture_gt_patch = F.interpolate(uv_tex_gt[:, :, y0:y1, x0:x1], [new_size, new_size], mode='bilinear')
+            uv_vis_mask_patch = F.interpolate(uv_vis_mask[:, :, y0:y1, x0:x1], [new_size, new_size], mode='bilinear')
+
+            losses['photo_detail'] = (uv_texture_patch * uv_vis_mask_patch - uv_texture_gt_patch * uv_vis_mask_patch).abs().mean() * self.cfg.loss.photo_D
+            losses['photo_detail_mrf'] = self.mrf_loss(uv_texture_patch * uv_vis_mask_patch,
+                                                       uv_texture_gt_patch * uv_vis_mask_patch) * self.cfg.loss.photo_D * self.cfg.loss.mrf
+
+            losses['z_reg'] = torch.mean(uv_z.abs())*self.cfg.loss.reg_z
+            losses['z_diff'] = lossfunc.shading_smooth_loss(uv_shading)*self.cfg.loss.reg_diff
+            if self.cfg.loss.reg_sym > 0.:
+                nonvis_mask = (1 - util.binary_erosion(uv_vis_mask))
+                losses['z_sym'] = (nonvis_mask*(uv_z - torch.flip(uv_z, [-1]).detach()).abs()).sum()*self.cfg.loss.reg_sym
+
+            # detail 총합
+            losses['all_loss_detail'] = (
+                    losses['photo_detail']
+                    + losses.get('photo_detail_mrf', 0.0)
+                    + losses['z_reg'] + losses['z_diff']
+                    + (losses.get('z_sym', 0.0))
+            )
+
+            # 시각화용 결과도 opdict에 추가(원문과 이름 호환)
+            opdict['predicted_detail_images'] = predicted_detail_images
+            opdict['trans_verts'] = trans_verts
+            opdict['uv_texture'] = uv_texture
+            opdict['uv_detail_normals'] = uv_detail_normals
+        else:
+            # train_detail=False일 때는 detail loss 계산 생략
+            losses['all_loss_detail'] = 0.0
 
         return losses, opdict
 
@@ -592,8 +597,9 @@ class Trainer(object):
                                 images=opdict['images'][visind]
                             )
                         
-                        ########## sshape detail add here
+                        ########## shape detail add here
                         # shape_detail_images 생성 (회색 mesh with detail normal + original background)
+                        # train_detail=True일 때만 detail 이미지 생성
                         shape_detail_images_full = None
                         shape_detail_images = None
                         shape_detail_images_full_old = None
@@ -602,7 +608,7 @@ class Trainer(object):
                         # DEBUG: opdict 키 확인
                         #print(f"[DEBUG] opdict keys related to detail: {[k for k in opdict.keys() if 'detail' in k or 'normal' in k]}")
                         
-                        if 'uv_detail_normals' in opdict:
+                        if self.train_detail and 'uv_detail_normals' in opdict:
                             #print(f"[DEBUG] uv_detail_normals found! shape: {opdict['uv_detail_normals'].shape}")
                             # OUR detail: uv_detail_normals를 screen space로 변환
                             detail_normal_images = F.grid_sample(
@@ -622,8 +628,8 @@ class Trainer(object):
                         #else:
                             #print(f"[DEBUG] uv_detail_normals NOT found in opdict!")
                         
-                        # DECA old detail: uv_detail_normals_old가 있으면 생성
-                        if 'uv_detail_normals_old' in opdict:
+                        # DECA old detail: uv_detail_normals_old가 있으면 생성 (train_detail=True일 때만)
+                        if self.train_detail and 'uv_detail_normals_old' in opdict:
                             #print(f"[DEBUG] uv_detail_normals_old found! shape: {opdict['uv_detail_normals_old'].shape}")
                             # old 버전용 grid와 alpha_images 생성
                             _, _, _, grid_old, alpha_images_old = self.mymodel.render.render_shape(
@@ -686,15 +692,17 @@ class Trainer(object):
                             }
                         # if 'predicted_images' in opdict.keys():
                         #     visdict['predicted_images'] = opdict['predicted_images'][visind]
-                        if 'predicted_detail_images' in opdict.keys():
+                        # train_detail=True일 때만 detail 이미지 추가
+                        if self.train_detail and 'predicted_detail_images' in opdict.keys():
                             visdict['predicted_detail_images'] = opdict['predicted_detail_images'][visind]
 
                         savepath = os.path.join(self.cfg.output_dir, self.cfg.train.vis_dir, f'{self.global_step:06}.jpg')
                         grid_image = util.visualize_grid(visdict, savepath, return_gird=True)
                         
                         # detail 이미지들을 별도 파일로 저장 (왼쪽: 원본 + coarse, 오른쪽: 원본 + detail)
+                        # train_detail=True일 때만 detail 이미지 저장
                         #print(f"[DEBUG] Checking shape_detail_images: {shape_detail_images is not None}")
-                        if shape_detail_images is not None:
+                        if self.train_detail and shape_detail_images is not None:
                             detail_savepath = os.path.join(self.cfg.output_dir, self.cfg.train.vis_dir, f'{self.global_step:06}_detail.jpg')
                             #print(f"[DEBUG] Detail savepath: {detail_savepath}")
                             

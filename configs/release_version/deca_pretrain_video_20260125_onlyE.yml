@@ -1,0 +1,83 @@
+# 실험일자: 20260125
+# OnlyExpressionA 방식: Coarse ViT가 expression만 추론하고, tex와 light는 DECA에서 가져옴.
+# Coarse 학습용 설정 (OnlyE 버전 - AU Loss 있음)
+# ============================================================================
+# 학습 방법 가이드 (Training Guide)
+# ============================================================================
+# 
+# 이 설정 파일은 Coarse 모델(BiViT)을 학습하기 위한 설정입니다.
+#
+# 【학습 모드 설정】
+# train 섹션에서 다음 옵션을 설정할 수 있습니다: 최소 하나는 True여야 합니다.
+#   - train_coarse: True/False  (Coarse 모델 학습 여부)
+#   - train_detail: True/False  (Detail 모델 학습 여부)
+#   - train_decoder: True/False  (Decoder 학습 여부)
+# ============================================================================
+# '''
+# first step:
+# pre-train the coarse model (i.e.𝐸𝑐) for two epochs with a batch size of 64,
+# with 𝜆𝑙𝑚𝑘=1𝑒−4, 𝜆𝑒𝑦𝑒=1.0, 𝜆𝜷=1𝑒−4, and 𝜆𝝍=1𝑒−4
+#
+# Why:
+# training with only lmk loss for good initialization,
+# because the use of photometric loss needs good initialization both in regression and optimization
+# and also, photometric loss needs differentiable rendering that makes the training slow
+#
+#
+# '''
+output_dir: "/media/cine/First/HWPJ2/ProjectResult/DetailNew_20260125_onlyE_OnlyE/"
+pretrained_modelpath: ''
+pretrained_coarse_modelpath: ''  # Coarse를 학습시키므로 빈 경로여도 작동함
+#model_path_HJ: '/home/cine/Documents/HJCode/GANE_code/Training/testGATE30/model.tar'
+dataset:
+  batch_size: 1
+  K: 3  # K = windowsize
+loss:
+  expression: 0.8
+  eyed: 0.05
+  lipd: 0.0
+  lmk: 0.7
+  lmk_mp: 1.0
+  photo: 0.0
+  reg_exp: 1e-04
+  reg_jaw_pose: 0.0
+  #  reg_light: 0.0
+  reg_shape: 0.0
+  #  reg_tex: 0.
+  #  reg_light: 0.
+  reg_tex: 0.
+  reg_light: 0.
+  #  reg_tex: 0.0
+  relaL: 0.08
+  AUFLoss: 1.      # AU Loss 활성화 (OnlyE 버전)
+  mainAU: 0.5
+  subAU: 0.25
+  weightedAU: False
+  focalAU: False
+# Detail loss 값들 (주석 처리 - Coarse 학습용이므로)
+#mrf = 5e-2
+#photo_D = 2.
+#reg_sym = 0.005
+#reg_z = 0.005
+#reg_diff = 0.005
+#au_D = 0.0
+
+train:
+  # 학습 모드 설정 (최소 하나는 True여야 함)
+  train_coarse: True   # Coarse 모델(BiViT) 학습 여부
+  train_detail: False   # Detail 모델(ViTDetail, D_detail) 학습 여부
+  train_decoder: False   # Decoder 학습 여부
+
+  resume: True
+  max_epochs: 25
+  max_steps: 1000000000000000000
+  log_steps: 1000
+  vis_steps: 1000
+  checkpoint_steps: 500
+  #  val_steps: 500
+  #  eval_steps: 1000
+  #  lr: 1e-4
+  lr: 1e-4
+model:
+  use_tex: True
+
